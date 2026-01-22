@@ -12,8 +12,9 @@ const newSchema = mongoose.Schema({
     },
     status:{
         type:String,
-        enum:["in_progress","Completed"],
+        enum:["in_progress","quit","Completed"],
         required:true,
+        default:"in_progress"
     },
     endedReason:{
         type:String,
@@ -30,6 +31,10 @@ const newSchema = mongoose.Schema({
         averageScore: Number,
         strengths: [String],
         weaknesses: [String]
+    },
+    summaryGenerated: {
+        type: Boolean,
+        default: false
     }
 },{
     timestamps:true,

@@ -1,10 +1,16 @@
 const express = require("express");
 const router = express.Router();
-const {startInterviewController,nextQuestionCOntroller,submitAnswerController} = require("../controllers/interview.controller");
+const {startInterviewController,nextQuestionController,submitAnswerController, getInterviewResultController , resumeInterviewController, userQuitController} = require("../controllers/interview.controller");
+const {requireAuth} = require("../middlewares/auth.middleware");
+const { generateAISummary } = require("../services/aiSummary.service");
 
 
-router.post("/start",startInterviewController);
-router.post("/next",nextQuestionCOntroller);
-router.post("/answer",submitAnswerController);
+router.post("/start",requireAuth,startInterviewController);
+router.post("/next",requireAuth,nextQuestionController);
+router.post("/answer",requireAuth,submitAnswerController);
+router.get("/:id/result",requireAuth, getInterviewResultController);
+router.get("/:id/resume",requireAuth,resumeInterviewController);
+router.post("/:interviewId/quit",requireAuth,userQuitController);
+router.post("/:interviewId/summary",requireAuth,generateAISummary);
 
 module.exports = router;

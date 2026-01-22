@@ -3,6 +3,7 @@ const app = express();
 const cors = require("cors");
 const mongoose = require("mongoose");
 const interviewRoutes = require("./routes/interview.routes");
+const userAuth = require("./routes/auth.routes");
 
 app.use(express.json());
 app.use(express.urlencoded({extended:true}));
@@ -16,5 +17,6 @@ main().then(()=>console.log("Database Is connected...")).catch((err)=>console.lo
 
 
 app.use("/api/interview",interviewRoutes);
+app.use("/api/auth",userAuth);
 
 module.exports = app;
