@@ -1,117 +1,103 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "../components/ui/button";
-import api from "../lib/axios";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-
-type Interview = {
-    _id: string;
-    status: string;
-};
+import AnalyticsDashboard from "../components/AnalyticsDashboard";
+import { LayoutDashboard, History, Plus } from "lucide-react";
+import { useInterviews, type Interview } from "../hooks/useInterviews";
+import InterviewConfigDialog from "../components/interviews/InterviewConfigDialog";
+import InterviewHistoryList from "../components/interviews/InterviewHistoryList";
 
 export default function Interviews() {
-    const [interviews , setInterviews ] = useState<Interview[]>([]);
-    const [loading , setLoading] = useState<boolean>(true);
+  const { interviews, loading, creating, startInterview } = useInterviews();
+  const [isSettingUp, setIsSettingUp] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<"history" | "insights">("history");
 
-    const navigate = useNavigate();
-    const {logout} = useAuth();
+  const navigate = useNavigate();
+  const { logout } = useAuth();
 
-    useEffect(()=>{
-        const fetchInterviews = async(): Promise<void> =>{
-            try {
-                const res = await api.get<Interview[] | {data: Interview[]}>(
-                    "/interviews"
-                );
+  const handleLaunchInterview = async (payload: { role: string; topic: string; totalQuestions: number }) => {
+    try {
+      const interviewId = await startInterview(payload);
+      navigate(`/interview/${interviewId}`);
+    } catch {
+      alert("Failed to start interview");
+    }
+  };
 
-                const data = Array.isArray(res.data)
-                ? res.data
-                :Array.isArray(res.data?.data)
-                ? res.data.data 
-                : [];
+  const handleAction = (interview: Interview): void => {
+    if (interview.status === "in_progress") {
+      navigate(`/interview/${interview._id}`);
+    } else {
+      navigate(`/review/${interview._id}`);
+    }
+  };
 
-                setInterviews(data);
-            } catch (error) {
-                alert("Failed to load interviews");
-                setInterviews([]);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchInterviews();
-    },[]);
-
-    const handleStartNew = async (): Promise<void> =>{
-        try {
-            const res = await api.post<{interviewId:string}>(
-                "/interviews/start"
-            );
-
-            navigate(`/interview/${res.data.interviewId}`);
-        } catch (error) {
-            alert("Failed to start interview");
-        }
-    };
-
-    const handleAction = (interview: Interview): void => {
-        if (interview.status === "in_progress") {
-            navigate(`/interview/${interview._id}`);
-        } else {
-            navigate(`/summary/${interview._id}`);
-        }
-    };
-
-    if (loading) {
-        return <div className="p-6">Loading interviews...</div>;
-    };
-
+  if (loading) {
     return (
-    <div className="max-w-3xl mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Your Interviews</h1>
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="text-muted-foreground animate-pulse font-medium">Loading your journey...</div>
+      </div>
+    );
+  }
 
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={logout}>
+  if (isSettingUp) {
+    return (
+      <InterviewConfigDialog
+        onCancel={() => setIsSettingUp(false)}
+        onLaunch={handleLaunchInterview}
+        isCreating={creating}
+      />
+    );
+  }
+
+  return (
+    <div className="max-w-5xl mx-auto p-6 space-y-8">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b pb-6">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-extrabold tracking-tight">Success Dashboard</h1>
+          <p className="text-muted-foreground text-lg">Your journey to the dream job starts here.</p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <div className="flex bg-muted p-1 rounded-lg mr-2">
+            <Button
+              variant={activeTab === "history" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setActiveTab("history")}
+              className="gap-2"
+            >
+              <History className="h-4 w-4" /> History
+            </Button>
+            <Button
+              variant={activeTab === "insights" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setActiveTab("insights")}
+              className="gap-2"
+            >
+              <LayoutDashboard className="h-4 w-4" /> Insights
+            </Button>
+          </div>
+
+          <Button variant="outline" size="sm" onClick={logout} className="font-semibold h-9">
             Logout
           </Button>
 
-          <Button onClick={handleStartNew}>
-            Start New Interview
+          <Button onClick={() => setIsSettingUp(true)} size="sm" className="font-bold px-4 shadow-md h-9 gap-2">
+            <Plus className="h-4 w-4" /> New Session
           </Button>
         </div>
       </div>
 
-      {interviews.length > 0 ? (
-        <ul className="space-y-3">
-          {interviews.map((interview, index) => (
-            <li
-              key={interview._id}
-              className="flex justify-between items-center border rounded p-4"
-            >
-              <div>
-                <p className="font-medium">
-                  Interview #{index + 1}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Status: {interview.status}
-                </p>
-              </div>
-
-              <Button
-                variant="outline"
-                onClick={() => handleAction(interview)}
-              >
-                {interview.status === "in_progress"
-                  ? "Resume"
-                  : "View"}
-              </Button>
-            </li>
-          ))}
-        </ul>
+      {activeTab === "insights" ? (
+        <AnalyticsDashboard />
       ) : (
-        <p className="text-muted-foreground">
-          No interviews found.
-        </p>
+        <InterviewHistoryList
+          interviews={interviews}
+          onAction={handleAction}
+          onStartNew={() => setIsSettingUp(true)}
+        />
       )}
     </div>
   );
-};
+}

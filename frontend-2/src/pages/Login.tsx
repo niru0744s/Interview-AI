@@ -7,40 +7,40 @@ import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 
 type LoginResponse = {
-    token: string;
+  token: string;
 };
 
 export default function Login() {
-    const [email, setEmail] = useState<string>("");
-    const [password, setPassword] = useState<string>("");
-    const [loading, setLoading] = useState<boolean>(false);
+  const [email, setEmail] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
+  const [loading, setLoading] = useState<boolean>(false);
 
-    const { login } = useAuth();
-    const navigate = useNavigate();
+  const { login } = useAuth();
+  const navigate = useNavigate();
 
-    const handleSubmit = async (
-        e: React.FormEvent<HTMLFormElement>
-    ): Promise<void> => {
-        e.preventDefault();
+  const handleSubmit = async (
+    e: React.FormEvent<HTMLFormElement>
+  ): Promise<void> => {
+    e.preventDefault();
 
-        try {
-            setLoading(true);
+    try {
+      setLoading(true);
 
-            const res = await api.post<LoginResponse>("/auth/login", {
-                email,
-                password,
-            });
+      const res = await api.post<LoginResponse>("/auth/login", {
+        email,
+        password,
+      });
 
-            login(res.data.token);
-            navigate("/interviews");
-        } catch (err) {
-            alert("Invalid credentials");
-        } finally {
-            setLoading(false);
-        }
+      login(res.data.token);
+      navigate("/interviews");
+    } catch {
+      alert("Invalid credentials");
+    } finally {
+      setLoading(false);
     }
+  }
 
-    return (
+  return (
     <div className="min-h-screen flex items-center justify-center">
       <Card className="w-full max-w-sm">
         <CardHeader>

@@ -1,14 +1,14 @@
-import axios,{AxiosInstance, AxiosError, InternalAxiosRequestConfig, AxiosResponse} from "axios";
+import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig, AxiosResponse } from "axios";
 
 const api: AxiosInstance = axios.create({
-    baseURL: import.meta.env.BASE_URL as string,
+    baseURL: `${import.meta.env.VITE_BACKEND_URL}/api` as string,
 });
 
 api.interceptors.request.use(
     (config: InternalAxiosRequestConfig) => {
         const token = localStorage.getItem("token");
 
-        if(token && config.headers) {
+        if (token && config.headers) {
             config.headers.Authorization = `Bearer ${token}`;
         }
 
@@ -20,10 +20,10 @@ api.interceptors.request.use(
 
 api.interceptors.response.use(
     (response: AxiosResponse) => response,
-    (error: AxiosError) =>{
+    (error: AxiosError) => {
         const status = error.response?.status;
 
-        if(status === 401) {
+        if (status === 401) {
             localStorage.removeItem("token");
             window.location.href = "/login";
             return Promise.reject(error);
@@ -32,9 +32,9 @@ api.interceptors.response.use(
         return Promise.reject({
             status,
             message:
-            (error.response?.data as {message?: string})?.message || 
-            error.message || 
-            "Something went wrong",
+                (error.response?.data as { message?: string })?.message ||
+                error.message ||
+                "Something went wrong",
         });
     }
 );

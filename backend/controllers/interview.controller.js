@@ -1,22 +1,30 @@
-const { startInterview,nextQuestion,submitAnswer,getInterviewResult,resumeInterview } = require("../services/interview.service.js");
-const {Interview} = require("../models/Interview.js");
+const { startInterview, nextQuestion, submitAnswer, getInterviewResult, resumeInterview } = require("../services/interview.service.js");
+const Interview = require("../models/Interview.js");
+const InterviewAnswer = require("../models/InterviewAnswer.js");
 const InterviewSummary = require("../models/InterviewSummary.js");
-const {generateAISummary} = require("../services/aiSummary.service.js");
+const { generateAISummary } = require("../services/aiSummary.service.js");
 
 exports.startInterviewController = async (req, res) => {
   try {
-    const { role } = req.body;
+    if (!req.body) {
+      return res.status(400).json({ error: "Request body is missing" });
+    }
+    const { role, topic, totalQuestions } = req.body;
     if (!role) {
       return res.status(400).json({ error: "Role is required" });
     }
-    const userId = "66abc123fakeuserid";
-    const interview = await startInterview({ userId, role });
+    const userId = req.user._id;
+    const interview = await startInterview({
+      userId,
+      role,
+      topic: topic || "General",
+      totalQuestions: totalQuestions ? parseInt(totalQuestions) : 10
+    });
     res.json({ interviewId: interview._id });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
-
 
 exports.nextQuestionController = async (req, res) => {
   try {
@@ -39,16 +47,9 @@ exports.submitAnswerController = async (req, res) => {
         .status(400)
         .json({ error: "interviewId and answer are required" });
     }
-    const existing = await InterviewAnswer.findOne({ interviewId, question });
-      if (existing) {
-        throw new Error("Answer already submitted for this question");
-      }
-      let evaluation;
-      try {
-        evaluation = await submitAnswer({ interviewId, answer });
-      } catch (error) {
-        throw new Error("Evaluation failed , Please retry!");
-      }
+
+    // Evaluation call updated to match service signature
+    const evaluation = await submitAnswer(interviewId, answer);
     res.json(evaluation);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -58,18 +59,18 @@ exports.submitAnswerController = async (req, res) => {
 exports.userQuitController = async (req, res) => {
   try {
     const { interviewId } = req.params;
-    const userId = req.user.id;
+    const userId = req.user._id;
 
     const interview = await Interview.findOne({
       _id: interviewId,
-      user: userId
+      userId: userId
     });
 
     if (!interview) {
       return res.status(404).json({ message: "Interview not found" });
     }
 
-    if (interview.status === "quit" || interview.status === "completed") {
+    if (interview.status === "quit" || interview.status === "Completed") {
       return res.status(200).json({
         message: "Interview already finalized",
         status: interview.status
@@ -105,23 +106,23 @@ exports.getInterviewResultController = async (req, res) => {
   }
 };
 
-exports.resumeInterviewController = async(req,res) =>{
+exports.resumeInterviewController = async (req, res) => {
   try {
     const resume = await resumeInterview(req.params.id);
     res.json(resume);
   } catch (error) {
-    res.status(404).json({error: error.message});
+    res.status(404).json({ error: error.message });
   }
 };
 
 exports.generateInterviewSummaryController = async (req, res) => {
   try {
     const { interviewId } = req.params;
-    const userId = req.user.id;
+    const userId = req.user._id;
 
     const interview = await Interview.findOne({
       _id: interviewId,
-      user: userId
+      userId: userId
     });
 
     if (!interview) {
@@ -132,7 +133,8 @@ exports.generateInterviewSummaryController = async (req, res) => {
     if (existingSummary) {
       return res.status(200).json({
         message: "Summary already generated",
-        summary: existingSummary
+        summary: existingSummary,
+        interview
       });
     }
 
@@ -142,40 +144,82 @@ exports.generateInterviewSummaryController = async (req, res) => {
       });
     }
 
+    // Fetch answers accurately from the dedicated collection
+    const answers = await InterviewAnswer.find({ interviewId });
+
     const interviewPayload = {
-      questions: interview.questions,
-      answers: interview.answers,
+      totalQuestions: interview.totalQuestions,
+      answers: answers,
       status: interview.status,
-      quitReason: interview.quitReason || null,
-      startedAt: interview.startedAt,
-      endedAt: interview.endedAt
+      quitReason: interview.endedReason || null,
+      startedAt: interview.createdAt,
+      endedAt: interview.updatedAt
     };
 
     const aiResult = await generateAISummary(interviewPayload);
 
-    const summaryDoc = await InterviewSummary.create({
-      interview: interviewId,
-      user: userId,
-      score: aiResult.score,
-      strengths: aiResult.strengths,
-      weaknesses: aiResult.weaknesses,
-      verdict: aiResult.verdict,
-      feedback: aiResult.feedback
-    });
+    try {
+      const summaryDoc = await InterviewSummary.create({
+        interview: interviewId,
+        user: userId,
+        score: aiResult.score,
+        strengths: aiResult.strengths,
+        weaknesses: aiResult.weaknesses,
+        verdict: aiResult.verdict,
+        feedback: aiResult.feedback
+      });
 
-    interview.summaryGenerated = true;
-    interview.finalizedAt = new Date();
-    await interview.save();
+      interview.summaryGenerated = true;
+      interview.finalizedAt = new Date();
+      await interview.save();
 
-    return res.status(201).json({
-      message: "Interview summary generated",
-      summary: summaryDoc
-    });
+      return res.status(201).json({
+        message: "Interview summary generated",
+        summary: summaryDoc,
+        interview
+      });
+    } catch (err) {
+      // Handle race condition: If two requests hit simultaneously, one might fail with duplicate key error E11000
+      if (err.code === 11000) {
+        const existing = await InterviewSummary.findOne({ interview: interviewId });
+        if (existing) {
+          return res.status(200).json({
+            message: "Summary already exists (concurrency handled)",
+            summary: existing,
+            interview
+          });
+        }
+      }
+      throw err; // Rethrow if it's not a duplicate key error
+    }
 
   } catch (err) {
     console.error("Interview summary error:", err);
     return res.status(500).json({
-      message: "Failed to generate interview summary"
+      message: err.message || "Failed to generate interview summary"
     });
+  }
+};
+
+exports.getInterviewDetailController = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+
+    const interview = await Interview.findOne({ _id: id, userId });
+    if (!interview) {
+      return res.status(404).json({ message: "Interview not found" });
+    }
+
+    const answers = await InterviewAnswer.find({ interviewId: id }).sort({ createdAt: 1 });
+    const summary = await InterviewSummary.findOne({ interview: id });
+
+    res.json({
+      interview,
+      answers,
+      summary
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 };

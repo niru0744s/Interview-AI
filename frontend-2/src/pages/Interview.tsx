@@ -1,156 +1,178 @@
-import {useEffect, useState} from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
-import { Textarea } from "../components/ui/textarea";
 import api from "../lib/axios";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "../components/ui/alert-dialog";
+import { useSocketStateMachine } from "../hooks/useSocketStateMachine";
+import { useAuth } from "../context/AuthContext";
+import InterviewHeader from "../components/interview/InterviewHeader";
+import InterviewLiveArea from "../components/interview/InterviewLiveArea";
 
 type InterviewQuestion = {
-    questionId: string;
-    question: string;
+  questionId: string;
+  question: string;
+  currentIndex?: number;
+  totalQuestions?: number;
 };
 
 type RouteParams = {
-    interviewId: string;
+  interviewId: string;
+};
+
+type InterviewDetails = {
+  role: string;
+  topic: string;
+  totalQuestions: number;
 };
 
 export default function Interview() {
-    const {interviewId} = useParams<RouteParams>();
-    const navigate = useNavigate();
+  const { interviewId } = useParams<RouteParams>();
+  const navigate = useNavigate();
+  const { user } = useAuth();
 
-    const [question , setQuestion] = useState<InterviewQuestion | null>(null);
-    const [answer, setAnswer] = useState<string>("");
-    const [loading, setLoading] = useState<boolean>(true);
-    const [submitting, setSubmitting] = useState<boolean>(false);
-    const [error, setError] = useState<string | null>(null);
+  const [question, setQuestion] = useState<InterviewQuestion | null>(null);
+  const [details, setDetails] = useState<InterviewDetails | null>(null);
+  const [answer, setAnswer] = useState<string>("");
+  const [loading, setLoading] = useState<boolean>(true);
+  const [submitting, setSubmitting] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [optimisticAnswer, setOptimisticAnswer] = useState<string | null>(null);
 
-    useEffect(()=>{
-        if(!interviewId) return;
+  const { status, socket, error: socketError } = useSocketStateMachine(
+    import.meta.env.VITE_BACKEND_URL || "http://localhost:5000",
+    user?.token || null
+  );
 
-        const fetchQuestion = async (): Promise<void> =>{
-            try {
-                const res = await api.get<{question?: InterviewQuestion}>(
-                    `/interviews/${interviewId}/next`
-                );
+  const fetchDetails = useCallback(async () => {
+    if (!interviewId) return;
+    try {
+      const res = await api.get(`/interview/${interviewId}/resume`);
+      setDetails({
+        role: res.data.role,
+        topic: res.data.topic,
+        totalQuestions: res.data.totalQuestions
+      });
+    } catch (err) {
+      console.error("Failed to fetch interview details", err);
+    }
+  }, [interviewId]);
 
-                if(!res.data || !res.data.question){
-                    navigate(`/summary/${interviewId}`);
-                    return;
-                };
+  useEffect(() => {
+    fetchDetails();
+  }, [fetchDetails]);
 
-                setQuestion(res.data.question);
-            } catch (error) {
-                console.log(error);
-                setError("Failed to load question");
-            } finally{
-                setLoading(false);
-            }
-        };
+  const fetchNextQuestion = useCallback(() => {
+    if (socket && interviewId && status === "CONNECTED") {
+      setLoading(true);
+      socket.emit("next_question", { interviewId });
+    }
+  }, [socket, interviewId, status]);
 
-        fetchQuestion();
-    },[interviewId,navigate]);
+  useEffect(() => {
+    if (!socket || status !== "CONNECTED") return;
 
+    socket.on("question", (data: { question: InterviewQuestion }) => {
+      if (!data.question) {
+        navigate(`/summary/${interviewId}`);
+        return;
+      }
+      setQuestion(data.question);
+      setOptimisticAnswer(null);
+      setLoading(false);
+    });
 
-    const handleSubmit = async (): Promise<void> =>{
-        if(!interviewId || !answer.trim() || !question) return;
+    socket.on("interview_completed", () => {
+      navigate(`/summary/${interviewId}`);
+    });
 
-        try {
-            setSubmitting(true);
+    socket.on("error", (msg: string) => {
+      setError(msg);
+      setSubmitting(false);
+      setLoading(false);
+      setOptimisticAnswer(null);
+    });
 
-            await api.post(`/interviews/${interviewId}/answer`,{
-                questionId: question.questionId,
-                answer,
-            });
-
-            setAnswer("");
-            setQuestion(null);
-            setLoading(true);
-
-            const res = await api.get<{ question?: InterviewQuestion }>(
-            `/interviews/${interviewId}/next`
-            );
-
-            if (!res.data || !res.data.question) {
-            navigate(`/summary/${interviewId}`);
-            return;
-            }
-
-            setQuestion(res.data.question);
-        } catch (err) {
-            console.error(err);
-            alert("Failed to submit answer");
-        } finally {
-            setSubmitting(false);
-            setLoading(false);
-        }
-    };
-
-    const handleQuit = async():Promise <void> => {
-        if(!interviewId) return;
-
-        try{
-            await api.post(`/interviews/${interviewId}/quit`);
-            navigate("/interviews");
-        } catch(err){
-            alert("Failed to quit interview");
-        }
-    };
-
-    if(loading){
-        return <div className="p-6">Loading question...</div>;
+    if (!question && !optimisticAnswer) {
+      fetchNextQuestion();
     }
 
-     if (error) {
-        return <div className="p-6 text-red-500">{error}</div>;
+    return () => {
+      socket.off("question");
+      socket.off("interview_completed");
+      socket.off("error");
+    };
+  }, [socket, status, interviewId, navigate, question, fetchNextQuestion, optimisticAnswer]);
+
+  const handleSubmit = async (): Promise<void> => {
+    if (!interviewId || !answer.trim() || !question || !socket) return;
+
+    const submittedAnswer = answer.trim();
+    setOptimisticAnswer(submittedAnswer);
+    setAnswer("");
+    setSubmitting(true);
+
+    socket.emit(
+      "submit_answer",
+      {
+        interviewId,
+        questionId: question.questionId,
+        answer: submittedAnswer,
+      },
+      (ack: { status: string; message?: string }) => {
+        setSubmitting(false);
+        if (ack.status === "error") {
+          setError(ack.message || "Failed to submit answer");
+          setAnswer(submittedAnswer);
+          setOptimisticAnswer(null);
+        } else {
+          setQuestion(null);
+        }
+      }
+    );
+  };
+
+  const handleQuit = async (): Promise<void> => {
+    if (!interviewId) return;
+    try {
+      await api.post(`/interview/${interviewId}/quit`);
+      navigate("/interviews");
+    } catch {
+      alert("Failed to quit interview");
     }
-  return (
-    <div className="max-w-3xl mx-auto p-6 space-y-6">
-      <h2 className="text-xl font-semibold">Interview Question</h2>
+  };
 
-      <div className="border rounded p-4">
-        <p className="whitespace-pre-wrap">
-          {question?.question || "No question available"}
-        </p>
-      </div>
-
-      <Textarea
-        placeholder="Type your answer here..."
-        value={answer}
-        onChange={(e) => setAnswer(e.target.value)}
-        rows={6}
-      />
-
-      <div className="flex justify-between">
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button variant="outline">Quit Interview</Button>
-          </AlertDialogTrigger>
-
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Quit interview?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Your progress will be saved, but this interview cannot be
-                resumed.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleQuit}>
-                Quit
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
-        <Button
-          onClick={handleSubmit}
-          disabled={submitting || !answer.trim()}
-        >
-          {submitting ? "Submitting..." : "Submit Answer"}
+  if (socketError || error) {
+    return (
+      <div className="p-6 text-red-500 text-center">
+        <h3 className="text-lg font-bold">Error</h3>
+        <p>{socketError || error}</p>
+        <Button className="mt-4" onClick={() => window.location.reload()}>
+          Retry Connection
         </Button>
       </div>
+    );
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto p-6 space-y-6">
+      <InterviewHeader
+        role={details?.role}
+        topic={details?.topic}
+        currentIndex={question?.currentIndex}
+        totalQuestions={question?.totalQuestions || details?.totalQuestions}
+        status={status}
+      />
+
+      <InterviewLiveArea
+        loading={loading}
+        optimisticAnswer={optimisticAnswer}
+        question={question?.question}
+        answer={answer}
+        setAnswer={setAnswer}
+        submitting={submitting}
+        canSubmit={!submitting && !!answer.trim() && status === "CONNECTED"}
+        onSubmit={handleSubmit}
+        onQuit={handleQuit}
+      />
     </div>
   );
 }

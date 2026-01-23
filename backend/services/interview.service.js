@@ -3,63 +3,89 @@ const Interview = require("../models/Interview.js");
 const InterviewAnswer = require("../models/InterviewAnswer.js");
 
 
-const MAX_QUESTIONS = 10;
-
-exports.startInterview = async({ userId,role })=> {
-   return await Interview.create({
+exports.startInterview = async ({ userId, role, topic, totalQuestions }) => {
+  return await Interview.create({
     userId,
-    role
+    role,
+    topic: topic || "General",
+    totalQuestions: totalQuestions || 10
   });
 }
 
-exports.nextQuestion = async (interviewId)=> {
+exports.nextQuestion = async (interviewId) => {
   const interview = await Interview.findById(interviewId);
-  if(!interview) throw new Error("Interview Not Found");
-  const asked = await InterviewAnswer.find({ interviewId }).select("question");
+  if (!interview) throw new Error("Interview Not Found");
 
-  const difficulty =
-    interview.currentQuestionIndex < 3
-      ? "easy"
-      : interview.currentQuestionIndex < 7
-      ? "medium"
-      : "hard";
+  if (interview.status.toLowerCase() === "completed") {
+    return null;
+  }
+
+  // If there's already a current question that hasn't been answered, return it
+  if (interview.currentQuestion) {
+    return {
+      questionId: interview.currentQuestionId || `q_${Date.now()}`,
+      question: interview.currentQuestion,
+      currentIndex: interview.currentQuestionIndex + 1,
+      totalQuestions: interview.totalQuestions
+    };
+  }
+
+  const asked = await InterviewAnswer.find({ interviewId }).select("question score");
+
+  // Adaptive Difficulty Logic
+  let difficulty = "easy";
+  if (interview.currentQuestionIndex > 0 && asked.length > 0) {
+    const totalScore = asked.reduce((sum, ans) => sum + (ans.score || 0), 0);
+    const avgScore = totalScore / asked.length;
+
+    if (avgScore > 7.5) difficulty = "hard";
+    else if (avgScore >= 5) difficulty = "medium";
+    else difficulty = "easy";
+  }
 
   const question = await generateQuestion({
     role: interview.role,
+    topic: interview.topic,
     difficulty,
     askedQuestions: asked.map(q => q.question)
   });
-  return question;
+
+  const questionData = {
+    ...question,
+    currentIndex: interview.currentQuestionIndex + 1, // 1-indexed for UI
+    totalQuestions: interview.totalQuestions
+  };
+
+  interview.currentQuestion = question.question;
+  interview.currentQuestionId = question.questionId;
+  await interview.save();
+
+  return questionData;
 }
 
 exports.submitAnswer = async (interviewId, answer) => {
 
   const interview = await Interview.findById(interviewId);
-  if(!interview) throw new Error("Interview Not Found.");
+  if (!interview) throw new Error("Interview Not Found.");
 
-  if (interview.status === "Completed") {
+  if (interview.status.toLowerCase() === "completed") {
     throw new Error("Interview already completed");
   }
 
- const lastQuestion = await InterviewAnswer.findOne({ interviewId })
-    .sort({ createdAt: -1 })
-    .select("question");
+  const question = interview.currentQuestion;
+  if (!question) throw new Error("No active question found to answer");
 
-  if (!lastQuestion) throw new Error("No question found");
-
-  const question = lastQuestion.question;
-
-    const alreadyAnswered = await InterviewAnswer.findOne({
+  const alreadyAnswered = await InterviewAnswer.findOne({
     interviewId,
     question,
     answer: { $exists: true }
   });
 
-   if (alreadyAnswered) {
+  if (alreadyAnswered) {
     throw new Error("Answer already submitted for this question");
   }
 
-    let evaluation;
+  let evaluation;
   try {
     evaluation = await evaluateAnswer({
       role: interview.role,
@@ -83,20 +109,20 @@ exports.submitAnswer = async (interviewId, answer) => {
   interview.currentQuestionIndex += 1;
   interview.totalScore += evaluation.score;
 
-  if (interview.currentQuestionIndex >= MAX_QUESTIONS) {
-     const summary = await generateInterviewSummary(interviewId);
+  if (interview.currentQuestionIndex >= interview.totalQuestions) {
     interview.status = "Completed";
-    interview.finalSummary = summary;
   }
-  
+
+  interview.currentQuestion = null; // Clear the current question after answering
+  interview.currentQuestionId = null;
   await interview.save();
   return {
     ...evaluation,
-    interviewCompleted: interview.status === "completed"
+    interviewCompleted: interview.status.toLowerCase() === "completed"
   };
 };
 
-exports.resumeInterview = async(interviewId)=> {
+exports.resumeInterview = async (interviewId) => {
   const interview = await Interview.findById(interviewId);
   if (!interview) throw new Error("Interview not found");
 
@@ -110,12 +136,14 @@ exports.resumeInterview = async(interviewId)=> {
   return {
     interviewId,
     role: interview.role,
+    topic: interview.topic,
     currentQuestionIndex: interview.currentQuestionIndex,
+    totalQuestions: interview.totalQuestions,
     answeredCount: answers.length
   };
 }
 
-exports.getInterviewHistory = async(req, res)=> {
+exports.getInterviewHistory = async (req, res) => {
   const userId = req.user.id;
 
   const interviews = await Interview.find({ userId })

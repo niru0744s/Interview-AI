@@ -6,6 +6,7 @@ import Landing from "../pages/Landing";
 import Login from "../pages/Login";
 import Interviews from "../pages/Interviews";
 import Summary from "../pages/Summary";
+import ReviewSession from "../pages/ReviewSession";
 
 export const router = createBrowserRouter([
     {
@@ -30,6 +31,11 @@ export const router = createBrowserRouter([
     {
         path: "/summary/:interviewId",
         element: (<ProtectedRoute><Summary /></ProtectedRoute>),
+        errorElement: <RouteError />
+    },
+    {
+        path: "/review/:interviewId",
+        element: (<ProtectedRoute><ReviewSession /></ProtectedRoute>),
         errorElement: <RouteError />
     }
 ]);

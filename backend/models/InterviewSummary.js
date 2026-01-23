@@ -20,8 +20,7 @@ const interviewSummarySchema = new mongoose.Schema(
     score: {
       type: Number,
       required: true,
-      min: 0,
-      max: 100
+      min: 0
     },
 
     strengths: {

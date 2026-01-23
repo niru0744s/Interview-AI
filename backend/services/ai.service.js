@@ -1,4 +1,3 @@
-// import OpenAI from "openai";
 const { OpenAI } = require("openai");
 
 const client = new OpenAI({
@@ -9,12 +8,13 @@ const client = new OpenAI({
 /**
  * Generate one interview question
  */
-exports.generateQuestion = async({ role, difficulty, askedQuestions })=> {
+exports.generateQuestion = async ({ role, topic, difficulty, askedQuestions }) => {
   const systemPrompt = `
 You are a strict technical interviewer for a ${role} role.
+The specific focus/topic for this part of the interview is: ${topic}.
 
 Rules:
-- Ask ONE interview-level technical question
+- Ask ONE interview-level technical question strictly related to the topic: ${topic}.
 - No explanations
 - No hints
 - Do not repeat previous questions
@@ -30,19 +30,21 @@ Ask the next question.
 
   const response = await client.chat.completions.create({
     model: "sonar",
-    contents: "You Are an AI Interviewer",
-    messages:[
+    messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt }
     ],
     temperature: 0.4,
-    disable_search: true
+    // disable_search: true // Optional: check if sonar-small/large etc needs this
   });
 
-  return response;
+  return {
+    questionId: `q_${Date.now()}`,
+    question: response.choices[0].message.content.trim()
+  };
 }
 
-exports.evaluateAnswer = async({ role, question, answer }) => {
+exports.evaluateAnswer = async ({ role, question, answer }) => {
   const systemPrompt = `
 You are a strict technical interviewer evaluating a candidate.
 
@@ -74,34 +76,43 @@ Candidate Answer: ${answer}
 
   const response = await client.chat.completions.create({
     model: "sonar",
-    contents:"You are an AI Interviewer",
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt }
     ],
     temperature: 0.2,
-    disable_search: true,
-    response_format: { type: "text" }
+    // response_format: { type: "json_object" } // Sonic model support?
   });
 
-  function assertEvaluationShape(obj) {
-  if (
-    typeof obj.score !== "number" ||
-    obj.score < 0 ||
-    obj.score > 10 ||
-    !Array.isArray(obj.strengths) ||
-    !Array.isArray(obj.missing_points) ||
-    typeof obj.ideal_answer !== "string"
-  ) {
-    throw new Error("Invalid evaluation schema");
-  }
-}
-
   let content = response.choices[0].message.content;
-  assertEvaluationShape(content);
+
+  // Extract JSON using regex to handle potential markdown or preamble text
+  const jsonMatch = content.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    console.error("No JSON found in AI response:", content);
+    throw new Error("AI failed to return evaluation JSON");
+  }
+  content = jsonMatch[0];
+
+  function assertEvaluationShape(obj) {
+    if (
+      typeof obj.score !== "number" ||
+      obj.score < 0 ||
+      obj.score > 10 ||
+      !Array.isArray(obj.strengths) ||
+      !Array.isArray(obj.missing_points) ||
+      typeof obj.ideal_answer !== "string"
+    ) {
+      throw new Error("Invalid evaluation schema");
+    }
+  }
+
   try {
-    return JSON.parse(content);
+    const parsed = JSON.parse(content);
+    assertEvaluationShape(parsed);
+    return parsed;
   } catch (err) {
-    throw new Error("AI returned invalid JSON");
+    console.error("AI Response logic error:", err, "Content:", content);
+    throw new Error("AI returned invalid evaluation format");
   }
 };

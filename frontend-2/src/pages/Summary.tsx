@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
+import { Loader2 } from "lucide-react";
 import api from "../lib/axios";
 
 type InterviewSummary = {
@@ -11,6 +12,15 @@ type InterviewSummary = {
     feedback?: string;
 };
 
+type SummaryResponse = {
+    summary: InterviewSummary;
+    interview: {
+        role: string;
+        topic: string;
+        totalQuestions: number;
+    };
+};
+
 type RouteParams = {
     interviewId: string;
 };
@@ -18,31 +28,30 @@ type RouteParams = {
 export default function Summary() {
     const { interviewId } = useParams<RouteParams>();
     const navigate = useNavigate();
+    const isFetching = useRef(false);
 
     const [summary, setSummary] = useState<InterviewSummary | null>(null);
+    const [totalQuestions, setTotalQuestions] = useState<number>(0);
+    const [meta, setMeta] = useState<{ role: string; topic: string } | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (!interviewId) return;
+        if (!interviewId || isFetching.current) return;
 
         const fetchSummary = async (): Promise<void> => {
+            isFetching.current = true;
             try {
-                const res = await api.post<
-                    InterviewSummary | { summary?: InterviewSummary }
-                >(`/interviews/${interviewId}/summary`);
+                const res = await api.post<SummaryResponse>(`/interview/${interviewId}/summary`);
+                console.log("Summary response:", res.data);
 
-                const data =
-                    "summary" in res.data ? res.data.summary : (res.data as InterviewSummary);
-
-                if (data === undefined) {
-                    throw new Error("Invalid summary response");
-                }
-
-                setSummary(data);
-            } catch (err) {
-                console.error(err);
-                setError("Failed to load interview summary");
+                setSummary(res.data.summary);
+                setTotalQuestions(res.data.interview.totalQuestions);
+                setMeta({ role: res.data.interview.role, topic: res.data.interview.topic });
+            } catch (err: unknown) {
+                console.error("Fetch summary error:", err);
+                const errorMessage = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to load interview summary";
+                setError(errorMessage);
             } finally {
                 setLoading(false);
             }
@@ -52,7 +61,13 @@ export default function Summary() {
     }, [interviewId]);
 
     if (loading) {
-        return <div className="p-6">Generating summary...</div>;
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
+                <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                <p className="text-lg font-medium">Generating your interview summary...</p>
+                <p className="text-sm text-muted-foreground">This may take a few moments as AI analyzes your performance.</p>
+            </div>
+        );
     }
 
     if (error) {
@@ -72,12 +87,19 @@ export default function Summary() {
 
     return (
         <div className="max-w-3xl mx-auto p-6 space-y-6">
-            <h1 className="text-2xl font-bold">Interview Summary</h1>
+            <div className="space-y-1">
+                <h1 className="text-3xl font-bold">Interview Summary</h1>
+                {meta && (
+                    <p className="text-muted-foreground font-medium">
+                        {meta.role} {meta.topic && `• ${meta.topic}`}
+                    </p>
+                )}
+            </div>
 
             <div className="border rounded p-4 space-y-2">
                 <p>
                     <strong>Score:</strong>{" "}
-                    {summary.score ?? "N/A"}
+                    {summary.score ?? "N/A"} / {totalQuestions * 10}
                 </p>
                 <p>
                     <strong>Verdict:</strong>{" "}
@@ -124,9 +146,14 @@ export default function Summary() {
                 </p>
             </div>
 
-            <Button onClick={() => navigate("/interviews")}>
-                Back to Interviews
-            </Button>
+            <div className="flex gap-4">
+                <Button variant="outline" onClick={() => navigate("/interviews")}>
+                    Back to Dashboard
+                </Button>
+                <Button onClick={() => navigate(`/review/${interviewId}`)}>
+                    View Detailed Review
+                </Button>
+            </div>
         </div>
     );
 }
