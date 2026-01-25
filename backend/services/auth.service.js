@@ -4,7 +4,7 @@ const User = require("../models/User.js");
 
 const JWT_EXPIRES_IN = "7d";
 
-exports.registerUser = async({ email, password })=> {
+exports.registerUser = async ({ email, password }) => {
   const existing = await User.findOne({ email });
   if (existing) throw new Error("User already exists");
 
@@ -15,10 +15,16 @@ exports.registerUser = async({ email, password })=> {
     password: hashedPassword
   });
 
-  return user;
+  const token = jwt.sign(
+    { userId: user._id },
+    process.env.JWT_SECRET,
+    { expiresIn: JWT_EXPIRES_IN }
+  );
+
+  return { token, user };
 }
 
-exports.loginUser = async({ email, password })=> {
+exports.loginUser = async ({ email, password }) => {
   const user = await User.findOne({ email });
   if (!user) throw new Error("Invalid credentials");
 

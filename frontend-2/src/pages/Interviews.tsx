@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Button } from "../components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
 import AnalyticsDashboard from "../components/AnalyticsDashboard";
 import { LayoutDashboard, History, Plus } from "lucide-react";
+import { cn } from "../lib/utils";
 import { useInterviews, type Interview } from "../hooks/useInterviews";
 import InterviewConfigDialog from "../components/interviews/InterviewConfigDialog";
 import InterviewHistoryList from "../components/interviews/InterviewHistoryList";
+import { toast } from "sonner";
 
 export default function Interviews() {
   const { interviews, loading, creating, startInterview } = useInterviews();
@@ -14,14 +15,31 @@ export default function Interviews() {
   const [activeTab, setActiveTab] = useState<"history" | "insights">("history");
 
   const navigate = useNavigate();
-  const { logout } = useAuth();
 
-  const handleLaunchInterview = async (payload: { role: string; topic: string; totalQuestions: number }) => {
+  const handleLaunchInterview = async (payload: {
+    role: string;
+    topic: string;
+    totalQuestions: number;
+    resumeFile: File | null;
+    resumeText: string;
+  }) => {
     try {
-      const interviewId = await startInterview(payload);
+      const formData = new FormData();
+      formData.append("role", payload.role);
+      formData.append("topic", payload.topic);
+      formData.append("totalQuestions", payload.totalQuestions.toString());
+
+      if (payload.resumeFile) {
+        formData.append("resumeFile", payload.resumeFile);
+      } else if (payload.resumeText) {
+        formData.append("resumeText", payload.resumeText);
+      }
+
+      const interviewId = await startInterview(formData);
+      toast.success("AI is ready! Launching your session...");
       navigate(`/interview/${interviewId}`);
     } catch {
-      alert("Failed to start interview");
+      toast.error("Failed to start interview. Please try again.");
     }
   };
 
@@ -52,20 +70,23 @@ export default function Interviews() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto p-6 space-y-8">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b pb-6">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-extrabold tracking-tight">Success Dashboard</h1>
-          <p className="text-muted-foreground text-lg">Your journey to the dream job starts here.</p>
+    <div className="max-w-5xl mx-auto p-6 space-y-12 py-12">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-white/10 pb-8">
+        <div className="space-y-2">
+          <h1 className="text-4xl md:text-5xl font-black tracking-tight text-gradient">Success Dashboard</h1>
+          <p className="text-muted-foreground text-xl font-medium">Your journey to the dream job starts here.</p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <div className="flex bg-muted p-1 rounded-lg mr-2">
+        <div className="flex flex-wrap gap-3">
+          <div className="flex glass p-1.5 rounded-2xl">
             <Button
               variant={activeTab === "history" ? "default" : "ghost"}
               size="sm"
               onClick={() => setActiveTab("history")}
-              className="gap-2"
+              className={cn(
+                "gap-2 px-6 rounded-xl transition-all duration-300",
+                activeTab === "history" && "btn-premium text-white shadow-lg"
+              )}
             >
               <History className="h-4 w-4" /> History
             </Button>
@@ -73,20 +94,20 @@ export default function Interviews() {
               variant={activeTab === "insights" ? "default" : "ghost"}
               size="sm"
               onClick={() => setActiveTab("insights")}
-              className="gap-2"
+              className={cn(
+                "gap-2 px-6 rounded-xl transition-all duration-300",
+                activeTab === "insights" && "btn-premium text-white shadow-lg"
+              )}
             >
               <LayoutDashboard className="h-4 w-4" /> Insights
             </Button>
           </div>
 
-          <Button variant="outline" size="sm" onClick={logout} className="font-semibold h-9">
-            Logout
-          </Button>
-
-          <Button onClick={() => setIsSettingUp(true)} size="sm" className="font-bold px-4 shadow-md h-9 gap-2">
+          <Button onClick={() => setIsSettingUp(true)} size="sm" className="btn-premium text-white font-black px-6 shadow-xl h-11 gap-2 rounded-xl glow-primary">
             <Plus className="h-4 w-4" /> New Session
           </Button>
         </div>
+
       </div>
 
       {activeTab === "insights" ? (

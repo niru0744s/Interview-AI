@@ -1,12 +1,18 @@
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, Navigate } from "react-router-dom";
 import ProtectedRoute from "../components/ProtectedRoute";
 import Interview from "../pages/Interview";
 import RouteError from "../components/RouteError";
 import Landing from "../pages/Landing";
 import Login from "../pages/Login";
+import Signup from "../pages/Signup";
 import Interviews from "../pages/Interviews";
 import Summary from "../pages/Summary";
 import ReviewSession from "../pages/ReviewSession";
+import RecruiterDashboard from "../pages/RecruiterDashboard";
+import InvitePage from "../pages/InvitePage";
+import JobResults from "../pages/JobResults";
+
+import Layout from "../components/Layout";
 
 export const router = createBrowserRouter([
     {
@@ -15,12 +21,31 @@ export const router = createBrowserRouter([
         errorElement: <RouteError />
     },
     {
-        path: "/login",
-        element: <Login />
+        path: "/invite/:code",
+        element: <Layout><InvitePage /></Layout>
     },
     {
+        path: "/recruiter",
+        element: (<ProtectedRoute><Layout><RecruiterDashboard /></Layout></ProtectedRoute>),
+        errorElement: <RouteError />
+    },
+    {
+        path: "/job/:templateId/results",
+        element: (<ProtectedRoute><Layout><JobResults /></Layout></ProtectedRoute>),
+        errorElement: <RouteError />
+    },
+    {
+        path: "/login",
+        element: <Layout><Login /></Layout>
+    },
+    {
+        path: "/signup",
+        element: <Layout><Signup /></Layout>
+    },
+
+    {
         path: "/interviews",
-        element: (<ProtectedRoute><Interviews /></ProtectedRoute>),
+        element: (<ProtectedRoute><Layout><Interviews /></Layout></ProtectedRoute>),
         errorElement: <RouteError />
     },
     {
@@ -30,12 +55,17 @@ export const router = createBrowserRouter([
     },
     {
         path: "/summary/:interviewId",
-        element: (<ProtectedRoute><Summary /></ProtectedRoute>),
+        element: (<ProtectedRoute><Layout><Summary /></Layout></ProtectedRoute>),
         errorElement: <RouteError />
     },
     {
         path: "/review/:interviewId",
-        element: (<ProtectedRoute><ReviewSession /></ProtectedRoute>),
+        element: (<ProtectedRoute><Layout><ReviewSession /></Layout></ProtectedRoute>),
         errorElement: <RouteError />
+    },
+    {
+        path: "*",
+        element: <Navigate to="/" replace />
     }
 ]);
+

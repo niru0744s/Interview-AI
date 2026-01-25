@@ -10,8 +10,8 @@ exports.getUserStatsController = async (req, res) => {
         const totalSessions = await Interview.countDocuments({ userId });
         const completedSessions = await Interview.countDocuments({ userId, status: "Completed" });
 
-        // 2. Average Score normalized to 10
-        const averageScoreResult = await InterviewSummary.aggregate([
+        // 2. Consolidate Summary-based Stats using $facet
+        const statsAggregation = await InterviewSummary.aggregate([
             { $match: { user: userId } },
             {
                 $lookup: {
@@ -23,81 +23,66 @@ exports.getUserStatsController = async (req, res) => {
             },
             { $unwind: "$interviewData" },
             {
-                $group: {
-                    _id: null,
-                    avgNormalizedScore: {
-                        $avg: {
-                            $divide: [
-                                "$score",
-                                { $ifNull: ["$interviewData.totalQuestions", 10] }
-                            ]
+                $facet: {
+                    averageScore: [
+                        {
+                            $group: {
+                                _id: null,
+                                avgNormalizedScore: {
+                                    $avg: {
+                                        $divide: [
+                                            "$score",
+                                            { $ifNull: ["$interviewData.totalQuestions", 10] }
+                                        ]
+                                    }
+                                }
+                            }
                         }
-                    }
+                    ],
+                    timeline: [
+                        { $sort: { createdAt: 1 } },
+                        {
+                            $project: {
+                                score: {
+                                    $divide: [
+                                        "$score",
+                                        { $ifNull: ["$interviewData.totalQuestions", 10] }
+                                    ]
+                                },
+                                date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }
+                            }
+                        }
+                    ],
+                    verdicts: [
+                        { $group: { _id: "$verdict", count: { $sum: 1 } } }
+                    ],
+                    roles: [
+                        {
+                            $group: {
+                                _id: "$interviewData.role",
+                                avgNormalizedScore: {
+                                    $avg: {
+                                        $divide: [
+                                            "$score",
+                                            { $ifNull: ["$interviewData.totalQuestions", 10] }
+                                        ]
+                                    }
+                                },
+                                sessions: { $sum: 1 }
+                            }
+                        },
+                        { $sort: { avgNormalizedScore: -1 } }
+                    ]
                 }
             }
         ]);
-        const averageScore = averageScoreResult.length > 0 ? averageScoreResult[0].avgNormalizedScore : 0;
 
-        // 3. Performance Timeline (Score normalized to 10 over time)
-        const timelineResult = await InterviewSummary.aggregate([
-            { $match: { user: userId } },
-            {
-                $lookup: {
-                    from: "interviews",
-                    localField: "interview",
-                    foreignField: "_id",
-                    as: "interviewData"
-                }
-            },
-            { $unwind: "$interviewData" },
-            { $sort: { createdAt: 1 } },
-            {
-                $project: {
-                    score: {
-                        $divide: [
-                            "$score",
-                            { $ifNull: ["$interviewData.totalQuestions", 10] }
-                        ]
-                    },
-                    date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }
-                }
-            }
-        ]);
+        const stats = statsAggregation[0] || { averageScore: [], timeline: [], verdicts: [], roles: [] };
 
-        // 4. Verdict Distribution
-        const verdictDistribution = await InterviewSummary.aggregate([
-            { $match: { user: userId } },
-            { $group: { _id: "$verdict", count: { $sum: 1 } } }
-        ]);
-
-        // 5. Role Performance normalized to 10
-        const rolePerformance = await InterviewSummary.aggregate([
-            { $match: { user: userId } },
-            {
-                $lookup: {
-                    from: "interviews",
-                    localField: "interview",
-                    foreignField: "_id",
-                    as: "interviewData"
-                }
-            },
-            { $unwind: "$interviewData" },
-            {
-                $group: {
-                    _id: "$interviewData.role",
-                    avgNormalizedScore: {
-                        $avg: {
-                            $divide: [
-                                "$score",
-                                { $ifNull: ["$interviewData.totalQuestions", 10] }
-                            ]
-                        }
-                    },
-                    sessions: { $sum: 1 }
-                }
-            },
-            { $sort: { avgNormalizedScore: -1 } }
-        ]);
+        const averageScore = stats.averageScore.length > 0 ? stats.averageScore[0].avgNormalizedScore : 0;
+        const timelineResult = stats.timeline;
+        const verdictDistribution = stats.verdicts;
+        const rolePerformance = stats.roles;
 
         res.json({
             totalSessions,

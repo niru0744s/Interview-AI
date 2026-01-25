@@ -1,4 +1,4 @@
-const { startInterview, nextQuestion, submitAnswer } = require("../services/interview.service");
+const { startInterview, nextQuestion, submitAnswer, skipQuestion } = require("../services/interview.service");
 const jwt = require("jsonwebtoken");
 
 exports.initSocket = (io) => {
@@ -49,20 +49,16 @@ exports.initSocket = (io) => {
         });
 
         socket.on("submit_answer", async ({ interviewId, answer }, callback) => {
-            // ACK immediately to allow frontend to show "Thinking..." state
             if (typeof callback === "function") {
                 callback({ status: "ok" });
             }
 
             try {
-                // Perform slow AI evaluation
                 const evaluation = await submitAnswer(interviewId, answer);
-                socket.emit("evaluation", evaluation);
 
                 if (evaluation.interviewCompleted) {
                     socket.emit("interview_completed", evaluation);
                 } else {
-                    // Automatically trigger and emit the next question
                     const nextQ = await nextQuestion(interviewId);
                     socket.emit("question", { question: nextQ });
                 }
@@ -72,8 +68,35 @@ exports.initSocket = (io) => {
             }
         });
 
+        socket.on("skip_question", async ({ interviewId }) => {
+            try {
+                const result = await skipQuestion(interviewId);
+
+                // If we are already processing a question (race condition check)
+                // Just return and let the existing process finish
+                if (result.alreadyProcessing) {
+                    console.log("Skip ignored: already processing next question for", interviewId);
+                    return;
+                }
+
+                if (result.interviewCompleted) {
+                    socket.emit("interview_completed");
+                } else {
+                    const nextQ = await nextQuestion(interviewId);
+                    socket.emit("question", { question: nextQ });
+                }
+            } catch (error) {
+                console.error("Skip Question Error:", error);
+                socket.emit("error", error.message || "Failed to skip question");
+            }
+        });
+
         socket.on("disconnect", () => {
             console.log("Client disconnected", socket.id);
+        });
+
+        socket.on("error", (err) => {
+            console.error("Socket Error for client", socket.id, ":", err);
         });
     });
 }

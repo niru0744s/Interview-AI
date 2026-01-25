@@ -3,12 +3,15 @@ const Interview = require("../models/Interview.js");
 const InterviewAnswer = require("../models/InterviewAnswer.js");
 
 
-exports.startInterview = async ({ userId, role, topic, totalQuestions }) => {
+exports.startInterview = async ({ userId, role, topic, totalQuestions, resumeContent, templateId, difficulty }) => {
   return await Interview.create({
     userId,
     role,
     topic: topic || "General",
-    totalQuestions: totalQuestions || 10
+    totalQuestions: totalQuestions || 10,
+    resumeContent: resumeContent || null,
+    templateId: templateId || null,
+    difficulty: difficulty || "intermediate"
   });
 }
 
@@ -32,22 +35,31 @@ exports.nextQuestion = async (interviewId) => {
 
   const asked = await InterviewAnswer.find({ interviewId }).select("question score");
 
-  // Adaptive Difficulty Logic
-  let difficulty = "easy";
+  // Baseline Difficulty mapping
+  const difficultyMap = {
+    beginner: "easy",
+    intermediate: "medium",
+    professional: "hard"
+  };
+
+  let difficulty = difficultyMap[interview.difficulty] || "medium";
+
+  // Adaptive Difficulty Logic - Shift based on performance
   if (interview.currentQuestionIndex > 0 && asked.length > 0) {
     const totalScore = asked.reduce((sum, ans) => sum + (ans.score || 0), 0);
     const avgScore = totalScore / asked.length;
 
-    if (avgScore > 7.5) difficulty = "hard";
-    else if (avgScore >= 5) difficulty = "medium";
-    else difficulty = "easy";
+    if (avgScore > 8) difficulty = "hard";
+    else if (avgScore < 5) difficulty = "easy";
+    // else stay at baseline or medium
   }
 
   const question = await generateQuestion({
     role: interview.role,
     topic: interview.topic,
     difficulty,
-    askedQuestions: asked.map(q => q.question)
+    askedQuestions: asked.map(q => q.question),
+    resumeContent: interview.resumeContent
   });
 
   const questionData = {
@@ -118,6 +130,50 @@ exports.submitAnswer = async (interviewId, answer) => {
   await interview.save();
   return {
     ...evaluation,
+    interviewCompleted: interview.status.toLowerCase() === "completed"
+  };
+};
+
+exports.skipQuestion = async (interviewId) => {
+  const interview = await Interview.findById(interviewId);
+  if (!interview) throw new Error("Interview Not Found");
+
+  if (interview.status.toLowerCase() === "completed") {
+    throw new Error("Interview already completed");
+  }
+
+  const question = interview.currentQuestion;
+  if (!question) {
+    // If no active question, we might be in-between questions (generating next)
+    // Return a flag to tell the caller we are already moving forward
+    return {
+      isSkipped: false,
+      alreadyProcessing: true,
+      interviewCompleted: interview.status.toLowerCase() === "completed"
+    };
+  }
+
+  await InterviewAnswer.create({
+    interviewId,
+    question,
+    answer: "SKIPPED",
+    score: 0,
+    isSkipped: true
+  });
+
+  interview.currentQuestionIndex += 1;
+  // Total score stays the same (adding 0)
+
+  if (interview.currentQuestionIndex >= interview.totalQuestions) {
+    interview.status = "Completed";
+  }
+
+  interview.currentQuestion = null;
+  interview.currentQuestionId = null;
+  await interview.save();
+
+  return {
+    isSkipped: true,
     interviewCompleted: interview.status.toLowerCase() === "completed"
   };
 };

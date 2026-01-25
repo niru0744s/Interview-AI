@@ -5,7 +5,8 @@ exports.generateAISummary = async (interviewPayload) => {
     status,
   } = interviewPayload;
 
-  const answeredCount = answers.length;
+  const answeredCount = answers.filter(a => !a.isSkipped).length;
+  const skippedCount = answers.filter(a => a.isSkipped).length;
 
   // Sum up the actual scores from each answer
   const totalScore = answers.reduce((sum, ans) => sum + (ans.score || 0), 0);
@@ -35,6 +36,6 @@ exports.generateAISummary = async (interviewPayload) => {
     weaknesses: weaknesses.length > 0 ? weaknesses : ["Opportunity for deeper technical detail"],
     feedback: status === "quit"
       ? "The interview ended early. While your answers showed promise, completing the full set of questions is recommended for a definitive evaluation."
-      : `You completed ${answeredCount} of ${totalQuestions} questions with an average quality of ${Math.round(performanceRatio * 100)}%. ${performanceRatio > 0.7 ? "Great job!" : "Keep practicing to improve your technical depth."}`
+      : `You answered ${answeredCount} questions, skipped ${skippedCount}, out of ${totalQuestions} total. Your average quality was ${Math.round(performanceRatio * 100)}%. ${performanceRatio > 0.7 ? "Great job!" : "Keep practicing to improve your technical depth."}`
   };
 };

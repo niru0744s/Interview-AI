@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import api from "../lib/axios";
-import { Loader2, ArrowLeft } from "lucide-react";
+import { Loader2, ChevronLeft } from "lucide-react";
 import ReviewSummaryHeader from "../components/review/ReviewSummaryHeader";
 import ReviewAnswerCard from "../components/review/ReviewAnswerCard";
 
@@ -74,14 +74,24 @@ export default function ReviewSession() {
 
     return (
         <div className="max-w-5xl mx-auto p-6 space-y-8">
-            <div className="flex items-center gap-4">
-                <Button variant="ghost" size="icon" onClick={() => navigate("/interviews")}>
-                    <ArrowLeft className="h-5 w-5" />
+            <div className="flex items-center gap-6 border-b border-white/5 pb-8">
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => navigate("/interviews")}
+                    className="h-12 w-12 rounded-2xl hover:bg-white/5 border border-white/10"
+                >
+                    <ChevronLeft className="h-6 w-6" />
                 </Button>
-                <div>
-                    <h1 className="text-3xl font-extrabold tracking-tight">{data.interview.role}</h1>
-                    <p className="text-muted-foreground">
-                        {data.interview.topic} • Session on {new Date(data.interview.createdAt).toLocaleDateString()} • {data.answers.length} Questions
+                <div className="space-y-1">
+                    <div className="flex items-center gap-3">
+                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Technical Analysis</span>
+                        <div className="h-1 w-1 rounded-full bg-white/20" />
+                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{new Date(data.interview.createdAt).toLocaleDateString()}</span>
+                    </div>
+                    <h1 className="text-4xl font-black tracking-tight leading-none">{data.interview.role}</h1>
+                    <p className="text-muted-foreground font-medium">
+                        {data.interview.topic} • {data.answers.length} Questions Evaluated
                     </p>
                 </div>
             </div>

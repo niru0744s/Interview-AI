@@ -1,5 +1,6 @@
 import { Card, CardContent } from "../ui/card";
-import { Star, CheckCircle2, Info } from "lucide-react";
+import { Star, MessageSquare, ShieldCheck, Zap, BrainCircuit } from "lucide-react";
+import { cn } from "../../lib/utils";
 
 type Answer = {
     _id: string;
@@ -18,42 +19,47 @@ interface ReviewAnswerCardProps {
 
 export default function ReviewAnswerCard({ answer, index }: ReviewAnswerCardProps) {
     return (
-        <Card className="overflow-hidden border-2 hover:border-primary/30 transition-colors">
-            <div className="bg-muted/30 p-4 border-b flex justify-between items-center">
-                <span className="font-bold text-sm uppercase tracking-wider text-muted-foreground">
-                    Question {index + 1}
-                </span>
-                <div className="flex items-center gap-2">
-                    <Star className={`h-4 w-4 ${answer.score >= 7 ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground"}`} />
-                    <span className="font-bold">{answer.score}/10</span>
+        <Card className="glass-card border-white/5 overflow-hidden group">
+            <div className="bg-muted/30 p-4 px-6 border-b border-white/5 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                    <span className="h-6 w-6 rounded-full bg-background flex items-center justify-center text-[10px] font-black border border-white/10">
+                        {index + 1}
+                    </span>
+                    <span className="font-black text-xs uppercase tracking-widest text-muted-foreground/60">
+                        Technical Query
+                    </span>
+                </div>
+                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-background/50 border border-white/10">
+                    <Star className={cn("h-4 w-4", answer.score >= 7 ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground")} />
+                    <span className="font-black text-sm">{answer.score}<span className="text-muted-foreground/50 text-[10px]">/10</span></span>
                 </div>
             </div>
-            <CardContent className="p-6 space-y-6">
-                <div className="space-y-2">
-                    <h3 className="font-bold text-lg leading-snug">{answer.question}</h3>
+            <CardContent className="p-8 space-y-8">
+                <div className="space-y-3">
+                    <h3 className="font-black text-2xl leading-tight group-hover:text-primary transition-colors">{answer.question}</h3>
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                        <div className="space-y-2">
-                            <p className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1">
-                                Your Answer
+                <div className="grid lg:grid-cols-2 gap-8">
+                    <div className="space-y-6">
+                        <div className="space-y-3">
+                            <p className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] flex items-center gap-2">
+                                <MessageSquare className="h-3 w-3" /> Candidate Trace
                             </p>
-                            <div className="p-4 rounded-lg bg-muted/50 text-sm italic border border-dashed text-foreground/80">
+                            <div className="p-5 rounded-2xl bg-muted/40 text-sm font-medium italic border border-dashed border-white/10 text-foreground/80 leading-relaxed shadow-inner">
                                 "{answer.answer}"
                             </div>
                         </div>
 
-                        <div className="space-y-3">
+                        <div className="grid sm:grid-cols-2 gap-4">
                             {answer.strengths.length > 0 && (
-                                <div className="space-y-1.5">
-                                    <p className="text-xs font-bold uppercase text-green-600 flex items-center gap-1">
-                                        <CheckCircle2 className="h-3 w-3" /> Strengths
+                                <div className="space-y-3">
+                                    <p className="text-[10px] font-black uppercase text-green-500 tracking-[0.2em] flex items-center gap-2">
+                                        <ShieldCheck className="h-3 w-3" /> Points Scored
                                     </p>
-                                    <ul className="text-sm space-y-1">
+                                    <ul className="space-y-2">
                                         {answer.strengths.map((s, i) => (
-                                            <li key={i} className="flex items-start gap-2">
-                                                <span className="h-1.5 w-1.5 rounded-full bg-green-500 mt-1.5 shrink-0" />
+                                            <li key={i} className="flex items-start gap-2 text-xs font-bold leading-relaxed text-foreground/70">
+                                                <span className="h-1.5 w-1.5 rounded-full bg-green-500 mt-1.5 shrink-0 shadow-[0_0_5px_oklch(var(--color-green-500)/0.5)]" />
                                                 {s}
                                             </li>
                                         ))}
@@ -62,14 +68,14 @@ export default function ReviewAnswerCard({ answer, index }: ReviewAnswerCardProp
                             )}
 
                             {answer.missing_points.length > 0 && (
-                                <div className="space-y-1.5">
-                                    <p className="text-xs font-bold uppercase text-orange-600 flex items-center gap-1">
-                                        <Info className="h-3 w-3" /> Missing Points
+                                <div className="space-y-3">
+                                    <p className="text-[10px] font-black uppercase text-orange-400 tracking-[0.2em] flex items-center gap-2">
+                                        <Zap className="h-3 w-3" /> Growth Delta
                                     </p>
-                                    <ul className="text-sm space-y-1">
+                                    <ul className="space-y-2">
                                         {answer.missing_points.map((m, i) => (
-                                            <li key={i} className="flex items-start gap-2">
-                                                <span className="h-1.5 w-1.5 rounded-full bg-orange-500 mt-1.5 shrink-0" />
+                                            <li key={i} className="flex items-start gap-2 text-xs font-bold leading-relaxed text-foreground/70">
+                                                <span className="h-1.5 w-1.5 rounded-full bg-orange-400 mt-1.5 shrink-0" />
                                                 {m}
                                             </li>
                                         ))}
@@ -79,11 +85,11 @@ export default function ReviewAnswerCard({ answer, index }: ReviewAnswerCardProp
                         </div>
                     </div>
 
-                    <div className="space-y-2">
-                        <p className="text-xs font-bold uppercase text-primary flex items-center gap-1">
-                            Ideal AI Answer
+                    <div className="space-y-3">
+                        <p className="text-[10px] font-black uppercase text-primary tracking-[0.2em] flex items-center gap-2">
+                            <BrainCircuit className="h-3 w-3" /> AI Benchmark Answer
                         </p>
-                        <div className="p-4 rounded-lg bg-primary/5 border border-primary/20 text-sm leading-relaxed whitespace-pre-wrap">
+                        <div className="p-6 rounded-2xl bg-primary/5 border border-primary/10 text-sm font-medium leading-relaxed whitespace-pre-wrap shadow-inner">
                             {answer.ideal_answer}
                         </div>
                     </div>

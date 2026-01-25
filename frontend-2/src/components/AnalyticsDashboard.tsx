@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
 import {
-    LineChart,
-    Line,
     XAxis,
     YAxis,
     CartesianGrid,
@@ -9,14 +7,17 @@ import {
     ResponsiveContainer,
     PieChart,
     Pie,
-    Cell,
     BarChart,
     Bar,
+    AreaChart,
+    Area,
+    Cell,
     Legend
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/card";
 import api from "../lib/axios";
-import { Loader2, TrendingUp, Award, Target, Briefcase } from "lucide-react";
+import { Loader2, TrendingUp, Award, Target, Briefcase, Activity } from "lucide-react";
+import { cn } from "../lib/utils";
 
 type Stats = {
     totalSessions: number;
@@ -50,142 +51,154 @@ export default function AnalyticsDashboard() {
     if (loading) {
         return (
             <div className="flex justify-center items-center py-20">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <Loader2 className="h-10 w-10 animate-spin text-primary" />
             </div>
         );
     }
 
     if (!stats || stats.totalSessions === 0) {
         return (
-            <Card className="border-dashed py-12 text-center">
-                <CardContent>
-                    <p className="text-muted-foreground text-lg">Not enough data for analytics yet.</p>
-                    <p className="text-sm text-muted-foreground">Complete a few interviews to see your performance trends.</p>
+            <Card className="border-dashed border-2 py-20 text-center glass bg-transparent">
+                <CardContent className="space-y-4">
+                    <div className="bg-muted w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Activity className="h-8 w-8 text-muted-foreground/30" />
+                    </div>
+                    <p className="text-2xl font-bold">Insights pending</p>
+                    <p className="text-muted-foreground text-lg max-w-xs mx-auto leading-relaxed">
+                        Complete your first interview to unlock personalized performance analytics.
+                    </p>
                 </CardContent>
             </Card>
         );
     }
 
+    const firstScore = stats.performanceTimeline[0]?.score || 0;
+    const lastScore = stats.performanceTimeline[stats.performanceTimeline.length - 1]?.score || 0;
+    const improvement = stats.performanceTimeline.length > 1
+        ? Math.round(((lastScore - firstScore) / 10) * 100)
+        : 0;
+
     return (
-        <div className="space-y-6">
+        <div className="space-y-8 animate-in fade-in duration-700">
             {/* Overview Cards */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <Card className="hover:shadow-md transition-shadow">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Average Score</CardTitle>
-                        <Target className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{stats.averageScore}/10</div>
-                        <p className="text-xs text-muted-foreground">Overall performance</p>
-                    </CardContent>
-                </Card>
-                <Card className="hover:shadow-md transition-shadow">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Total Sessions</CardTitle>
-                        <Award className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{stats.totalSessions}</div>
-                        <p className="text-xs text-muted-foreground">{stats.completedSessions} completed</p>
-                    </CardContent>
-                </Card>
-                <Card className="hover:shadow-md transition-shadow">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Top Role</CardTitle>
-                        <Briefcase className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold truncate">
-                            {stats.rolePerformance[0]?.role || "N/A"}
-                        </div>
-                        <p className="text-xs text-muted-foreground">Highest scoring role</p>
-                    </CardContent>
-                </Card>
-                <Card className="hover:shadow-md transition-shadow">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Improvement</CardTitle>
-                        <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">
-                            {stats.performanceTimeline.length > 1
-                                ? `${Math.round(((stats.performanceTimeline[stats.performanceTimeline.length - 1].score - stats.performanceTimeline[0].score) / 10) * 100)}%`
-                                : "0%"}
-                        </div>
-                        <p className="text-xs text-muted-foreground">Since first session</p>
-                    </CardContent>
-                </Card>
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                {[
+                    { title: "Average Score", val: `${stats.averageScore}/10`, sub: "Overall ranking", icon: <Target className="h-5 w-5" />, color: "text-blue-500", bg: "bg-blue-500/10" },
+                    { title: "Total Sessions", val: stats.totalSessions, sub: `${stats.completedSessions} completed`, icon: <Activity className="h-5 w-5" />, color: "text-primary", bg: "bg-primary/10" },
+                    { title: "Top Specialist", val: stats.rolePerformance[0]?.role || "N/A", sub: "Peak performance", icon: <Briefcase className="h-5 w-5" />, color: "text-purple-500", bg: "bg-purple-500/10" },
+                    { title: "Improvement", val: `${improvement > 0 ? '+' : ''}${improvement}%`, sub: "Since inception", icon: <TrendingUp className="h-5 w-5" />, color: "text-green-500", bg: "bg-green-500/10" },
+                ].map((item, i) => (
+                    <Card key={i} className="glass-card border-white/5 overflow-hidden">
+                        <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                            <CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground">{item.title}</CardTitle>
+                            <div className={cn("p-2 rounded-xl transition-transform group-hover:scale-110", item.bg, item.color)}>
+                                {item.icon}
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-3xl font-black">{item.val}</div>
+                            <p className="text-sm font-medium text-muted-foreground/70 mt-1">{item.sub}</p>
+                        </CardContent>
+                    </Card>
+                ))}
             </div>
 
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
+            <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-7">
                 {/* Growth Curve */}
-                <Card className="lg:col-span-4">
+                <Card className="lg:col-span-4 glass-card border-white/5 overflow-hidden">
                     <CardHeader>
-                        <CardTitle>Performance History</CardTitle>
-                        <CardDescription>How your interview scores have evolved over time</CardDescription>
+                        <CardTitle className="text-2xl font-bold">Mastery Evolution</CardTitle>
+                        <CardDescription className="text-base">Real-time tracking of your technical growth trajectory</CardDescription>
                     </CardHeader>
-                    <CardContent className="h-[300px]">
+                    <CardContent className="h-[350px] pr-4">
                         <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={stats.performanceTimeline}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <AreaChart data={stats.performanceTimeline}>
+                                <defs>
+                                    <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="oklch(var(--primary))" stopOpacity={0.3} />
+                                        <stop offset="95%" stopColor="oklch(var(--primary))" stopOpacity={0} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="oklch(var(--border) / 0.5)" />
                                 <XAxis
                                     dataKey="date"
                                     fontSize={12}
+                                    fontWeight={600}
                                     tickLine={false}
                                     axisLine={false}
+                                    tick={{ fill: 'oklch(var(--muted-foreground))' }}
                                 />
                                 <YAxis
                                     domain={[0, 10]}
                                     fontSize={12}
+                                    fontWeight={600}
                                     tickLine={false}
                                     axisLine={false}
-                                    tickFormatter={(value) => `${value}`}
+                                    tick={{ fill: 'oklch(var(--muted-foreground))' }}
                                 />
                                 <Tooltip
                                     contentStyle={{
-                                        borderRadius: "8px",
-                                        border: "none",
-                                        boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)"
+                                        backgroundColor: 'oklch(var(--card))',
+                                        borderRadius: "16px",
+                                        border: "1px solid oklch(var(--border))",
+                                        boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1)",
+                                        padding: '12px'
                                     }}
+                                    itemStyle={{ color: 'oklch(var(--primary))', fontWeight: 800 }}
                                 />
-                                <Line
+                                <Area
                                     type="monotone"
                                     dataKey="score"
-                                    stroke="hsl(var(--primary))"
-                                    strokeWidth={2}
-                                    dot={{ fill: "hsl(var(--primary))", strokeWidth: 2 }}
-                                    activeDot={{ r: 6, strokeWidth: 0 }}
+                                    stroke="oklch(var(--primary))"
+                                    strokeWidth={4}
+                                    fillOpacity={1}
+                                    fill="url(#colorScore)"
+                                    dot={{ r: 4, fill: "oklch(var(--primary))", strokeWidth: 0 }}
+                                    activeDot={{ r: 8, strokeWidth: 0, className: 'glow-primary' }}
                                 />
-                            </LineChart>
+                            </AreaChart>
                         </ResponsiveContainer>
                     </CardContent>
                 </Card>
 
                 {/* Verdict Distribution */}
-                <Card className="lg:col-span-3">
+                <Card className="lg:col-span-3 glass-card border-white/5 overflow-hidden">
                     <CardHeader>
-                        <CardTitle>Success Rate</CardTitle>
-                        <CardDescription>Distribution of interview outcomes</CardDescription>
+                        <CardTitle className="text-2xl font-bold">Outcome Velocity</CardTitle>
+                        <CardDescription className="text-base">Distribution of your interview results</CardDescription>
                     </CardHeader>
-                    <CardContent className="h-[300px] flex justify-center items-center">
+                    <CardContent className="h-[350px] flex flex-col justify-center items-center">
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                                 <Pie
                                     data={stats.verdictDistribution}
                                     cx="50%"
                                     cy="50%"
-                                    innerRadius={60}
-                                    outerRadius={80}
-                                    paddingAngle={5}
+                                    innerRadius={80}
+                                    outerRadius={100}
+                                    paddingAngle={8}
                                     dataKey="value"
+                                    animationBegin={0}
+                                    animationDuration={1500}
                                 >
                                     {stats.verdictDistribution.map((_, index) => (
-                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} className="stroke-background stroke-2 hover:opacity-80 transition-opacity" />
                                     ))}
                                 </Pie>
-                                <Tooltip />
-                                <Legend layout="horizontal" verticalAlign="bottom" align="center" />
+                                <Tooltip
+                                    contentStyle={{
+                                        backgroundColor: 'oklch(var(--card))',
+                                        borderRadius: "16px",
+                                        border: "1px solid oklch(var(--border))",
+                                        padding: '12px'
+                                    }}
+                                />
+                                <Legend
+                                    verticalAlign="bottom"
+                                    align="center"
+                                    iconType="circle"
+                                    formatter={(val) => <span className="text-sm font-bold text-muted-foreground uppercase tracking-widest ml-1">{val}</span>}
+                                />
                             </PieChart>
                         </ResponsiveContainer>
                     </CardContent>
@@ -193,30 +206,48 @@ export default function AnalyticsDashboard() {
             </div>
 
             {/* Role Performance */}
-            <Card>
+            <Card className="glass-card border-white/5 overflow-hidden">
                 <CardHeader>
-                    <CardTitle>Role Breakdown</CardTitle>
-                    <CardDescription>Average performance across different job roles</CardDescription>
+                    <div className="flex items-center gap-3">
+                        <div className="p-3 rounded-2xl bg-primary/10 text-primary">
+                            <Award className="h-6 w-6" />
+                        </div>
+                        <div>
+                            <CardTitle className="text-2xl font-bold">Skill Specialization</CardTitle>
+                            <CardDescription className="text-base">Efficiency benchmarks across target roles</CardDescription>
+                        </div>
+                    </div>
                 </CardHeader>
-                <CardContent className="h-[300px]">
+                <CardContent className="h-[350px] pt-4">
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={stats.rolePerformance} layout="vertical">
-                            <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="oklch(var(--border) / 0.5)" />
                             <XAxis type="number" domain={[0, 10]} fontSize={12} hide />
                             <YAxis
                                 dataKey="role"
                                 type="category"
-                                fontSize={12}
-                                width={120}
+                                fontSize={14}
+                                fontWeight={700}
+                                width={180}
                                 tickLine={false}
                                 axisLine={false}
+                                tick={{ fill: 'oklch(var(--foreground))' }}
                             />
-                            <Tooltip cursor={{ fill: "transparent" }} />
+                            <Tooltip
+                                cursor={{ fill: 'rgba(0, 0, 0, 0.04)' }}
+                                contentStyle={{
+                                    backgroundColor: 'oklch(var(--card))',
+                                    borderRadius: "16px",
+                                    border: "1px solid oklch(var(--border))",
+                                    boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
+                                }}
+                            />
                             <Bar
                                 dataKey="avgScore"
-                                fill="hsl(var(--primary))"
-                                radius={[0, 4, 4, 0]}
-                                barSize={30}
+                                fill="oklch(var(--primary))"
+                                radius={[0, 12, 12, 0]}
+                                barSize={40}
+                                activeBar={{ opacity: 0.8, filter: 'brightness(1.1)' }}
                             />
                         </BarChart>
                     </ResponsiveContainer>

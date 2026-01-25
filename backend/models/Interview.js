@@ -5,6 +5,11 @@ const newSchema = mongoose.Schema({
         ref: "User",
         required: true,
     },
+    templateId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "JobTemplate",
+        default: null
+    },
     role: {
         type: String,
         required: true,
@@ -16,6 +21,11 @@ const newSchema = mongoose.Schema({
     totalQuestions: {
         type: Number,
         default: 10,
+    },
+    difficulty: {
+        type: String,
+        enum: ["beginner", "intermediate", "professional"],
+        default: "intermediate"
     },
     status: {
         type: String,
@@ -50,6 +60,10 @@ const newSchema = mongoose.Schema({
     summaryGenerated: {
         type: Boolean,
         default: false
+    },
+    resumeContent: {
+        type: String,
+        default: null
     }
 }, {
     timestamps: true,

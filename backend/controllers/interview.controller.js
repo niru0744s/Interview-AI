@@ -1,30 +1,38 @@
-const { startInterview, nextQuestion, submitAnswer, getInterviewResult, resumeInterview } = require("../services/interview.service.js");
+const { startInterview, nextQuestion, submitAnswer, skipQuestion, getInterviewResult, resumeInterview } = require("../services/interview.service.js");
 const Interview = require("../models/Interview.js");
 const InterviewAnswer = require("../models/InterviewAnswer.js");
 const InterviewSummary = require("../models/InterviewSummary.js");
 const { generateAISummary } = require("../services/aiSummary.service.js");
 
-exports.startInterviewController = async (req, res) => {
-  try {
-    if (!req.body) {
-      return res.status(400).json({ error: "Request body is missing" });
+const multer = require("multer");
+const pdf = require("pdf-parse");
+const upload = multer({ storage: multer.memoryStorage() });
+
+exports.startInterviewController = [
+  upload.single("resumeFile"),
+  async (req, res) => {
+    try {
+      const { role, topic, totalQuestions, resumeText, templateId, difficulty } = req.body;
+      let finalResumeContent = resumeText || null;
+
+      // ... (middle code handled by contiguous edit)
+
+      const userId = req.user._id;
+      const interview = await startInterview({
+        userId,
+        role,
+        topic: topic || "General",
+        totalQuestions: totalQuestions ? parseInt(totalQuestions) : 10,
+        resumeContent: finalResumeContent,
+        templateId: templateId || null,
+        difficulty: difficulty || "intermediate"
+      });
+      res.json({ interviewId: interview._id });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
     }
-    const { role, topic, totalQuestions } = req.body;
-    if (!role) {
-      return res.status(400).json({ error: "Role is required" });
-    }
-    const userId = req.user._id;
-    const interview = await startInterview({
-      userId,
-      role,
-      topic: topic || "General",
-      totalQuestions: totalQuestions ? parseInt(totalQuestions) : 10
-    });
-    res.json({ interviewId: interview._id });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
   }
-};
+];
 
 exports.nextQuestionController = async (req, res) => {
   try {
@@ -51,6 +59,19 @@ exports.submitAnswerController = async (req, res) => {
     // Evaluation call updated to match service signature
     const evaluation = await submitAnswer(interviewId, answer);
     res.json(evaluation);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.skipQuestionController = async (req, res) => {
+  try {
+    const { interviewId } = req.body;
+    if (!interviewId) {
+      return res.status(400).json({ error: "interviewId is required" });
+    }
+    const result = await skipQuestion(interviewId);
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

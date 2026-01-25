@@ -8,8 +8,9 @@ const interviewAnswerSchema = new mongoose.Schema(
       required: true
     },
     question: { type: String, required: true },
-    answer: { type: String, required: true },
-    score: { type: Number, required: true },
+    answer: { type: String },
+    score: { type: Number, default: 0 },
+    isSkipped: { type: Boolean, default: false },
     strengths: [{ type: String }],
     missing_points: [{ type: String }],
     ideal_answer: { type: String }

@@ -35,10 +35,14 @@ export function useInterviews() {
     fetchInterviews();
   }, [fetchInterviews]);
 
-  const startInterview = async (payload: { role: string; topic: string; totalQuestions: number }) => {
+  const startInterview = async (payload: FormData) => {
     setCreating(true);
     try {
-      const res = await api.post<{ interviewId: string }>("/interview/start", payload);
+      const res = await api.post<{ interviewId: string }>("/interview/start", payload, {
+        headers: {
+          "Content-Type": "multipart/form-data"
+        }
+      });
       return res.data.interviewId;
     } catch (error) {
       console.error("Failed to start interview", error);

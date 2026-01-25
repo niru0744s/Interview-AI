@@ -6,6 +6,7 @@ import { useSocketStateMachine } from "../hooks/useSocketStateMachine";
 import { useAuth } from "../context/AuthContext";
 import InterviewHeader from "../components/interview/InterviewHeader";
 import InterviewLiveArea from "../components/interview/InterviewLiveArea";
+import { toast } from "sonner";
 
 type InterviewQuestion = {
   questionId: string;
@@ -34,6 +35,8 @@ export default function Interview() {
   const [answer, setAnswer] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const [skipping, setSkipping] = useState<boolean>(false);
+  const [cooldown, setCooldown] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [optimisticAnswer, setOptimisticAnswer] = useState<string | null>(null);
 
@@ -78,6 +81,12 @@ export default function Interview() {
       setQuestion(data.question);
       setOptimisticAnswer(null);
       setLoading(false);
+      setSkipping(false);
+      setSubmitting(false);
+
+      // Prevent rapid fire clicking
+      setCooldown(true);
+      setTimeout(() => setCooldown(false), 1000);
     });
 
     socket.on("interview_completed", () => {
@@ -103,12 +112,13 @@ export default function Interview() {
   }, [socket, status, interviewId, navigate, question, fetchNextQuestion, optimisticAnswer]);
 
   const handleSubmit = async (): Promise<void> => {
-    if (!interviewId || !answer.trim() || !question || !socket) return;
+    if (!interviewId || !answer.trim() || !question || !socket || submitting || skipping) return;
 
     const submittedAnswer = answer.trim();
     setOptimisticAnswer(submittedAnswer);
     setAnswer("");
     setSubmitting(true);
+    setLoading(true); // Lock the UI
 
     socket.emit(
       "submit_answer",
@@ -123,6 +133,7 @@ export default function Interview() {
           setError(ack.message || "Failed to submit answer");
           setAnswer(submittedAnswer);
           setOptimisticAnswer(null);
+          setLoading(false); // Unlock if error
         } else {
           setQuestion(null);
         }
@@ -130,13 +141,23 @@ export default function Interview() {
     );
   };
 
+  const handleSkip = async (): Promise<void> => {
+    if (!interviewId || !socket || !question || skipping || submitting || cooldown) return;
+
+    setSkipping(true);
+    setLoading(true); // Lock the UI
+    socket.emit("skip_question", { interviewId });
+    setQuestion(null);
+  };
+
   const handleQuit = async (): Promise<void> => {
     if (!interviewId) return;
     try {
       await api.post(`/interview/${interviewId}/quit`);
+      toast.info("Session ended.");
       navigate("/interviews");
     } catch {
-      alert("Failed to quit interview");
+      toast.error("Failed to quit interview cleanly.");
     }
   };
 
@@ -169,8 +190,10 @@ export default function Interview() {
         answer={answer}
         setAnswer={setAnswer}
         submitting={submitting}
-        canSubmit={!submitting && !!answer.trim() && status === "CONNECTED"}
+        skipping={skipping || cooldown}
+        canSubmit={!submitting && !skipping && !loading && !cooldown && !!answer.trim() && status === "CONNECTED"}
         onSubmit={handleSubmit}
+        onSkip={handleSkip}
         onQuit={handleQuit}
       />
     </div>

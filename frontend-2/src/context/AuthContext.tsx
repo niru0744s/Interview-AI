@@ -2,12 +2,13 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 
 type User = {
     token: string;
+    role: "candidate" | "recruiter";
 };
 
 type AuthContextType = {
     user: User | null;
     loading: boolean;
-    login: (token: string) => void;
+    login: (token: string, role: "candidate" | "recruiter") => void;
     logout: () => void;
 };
 
@@ -17,31 +18,34 @@ type AuthContextProps = {
     children: ReactNode;
 };
 
-export const AuthProvider = ({children}: AuthContextProps) =>{
+export const AuthProvider = ({ children }: AuthContextProps) => {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
 
-    useEffect(()=>{
+    useEffect(() => {
         const token = localStorage.getItem("token");
-        if(token){
-            setUser({token});
+        const role = localStorage.getItem("role") as "candidate" | "recruiter";
+        if (token && role) {
+            setUser({ token, role });
         }
 
         setLoading(false);
-    },[]);
+    }, []);
 
-    const login = (token:string):void =>{
-        localStorage.setItem("token",token);
-        setUser({token});
+    const login = (token: string, role: "candidate" | "recruiter" = "candidate"): void => {
+        localStorage.setItem("token", token);
+        localStorage.setItem("role", role);
+        setUser({ token, role });
     };
 
-    const logout = (): void =>{
+    const logout = (): void => {
         localStorage.removeItem("token");
+        localStorage.removeItem("role");
         setUser(null);
     };
 
-    return(
-        <AuthContext.Provider value={{user ,loading, login , logout}}>
+    return (
+        <AuthContext.Provider value={{ user, loading, login, logout }}>
             {children}
         </AuthContext.Provider>
     )
