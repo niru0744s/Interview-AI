@@ -11,6 +11,9 @@ const interviewRoutes = require("./routes/interview.routes");
 const userAuth = require("./routes/auth.routes");
 const templateRoutes = require("./routes/template.routes");
 
+// Trust Proxy for Render
+app.set('trust proxy', 1);
+
 // Security Middleware
 app.use(helmet());
 app.use(cookieParser());
