@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
     Plus,
     Briefcase,
@@ -9,9 +9,6 @@ import {
     ChevronRight,
     Copy,
     Trash2,
-    ExternalLink,
-    Loader2,
-    BriefcaseBusiness
 } from "lucide-react";
 import api from "../lib/axios";
 import { toast } from "sonner";
@@ -26,9 +23,20 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
 
+interface Template {
+    _id: string;
+    title: string;
+    role: string;
+    topic: string;
+    description?: string;
+    totalQuestions: number;
+    difficulty: string;
+    inviteCode: string;
+}
+
 export default function RecruiterDashboard() {
     const navigate = useNavigate();
-    const [templates, setTemplates] = useState<any[]>([]);
+    const [templates, setTemplates] = useState<Template[]>([]);
     const [stats, setStats] = useState({ activePosts: 0, totalCandidates: 0, topHires: 0 });
     const [loading, setLoading] = useState(true);
     const [copiedCode, setCopiedCode] = useState<string | null>(null);
@@ -58,7 +66,7 @@ export default function RecruiterDashboard() {
         try {
             const res = await api.get("/templates/stats");
             setStats(res.data);
-        } catch (err) {
+        } catch {
             console.error("Failed to load recruiter stats");
         }
     };
@@ -67,7 +75,7 @@ export default function RecruiterDashboard() {
         try {
             const res = await api.get("/templates/my");
             setTemplates(res.data);
-        } catch (err) {
+        } catch {
             toast.error("Failed to load your job templates");
         }
     };
@@ -83,7 +91,7 @@ export default function RecruiterDashboard() {
             setIsModalOpen(false);
             setFormData({ title: "", role: "", topic: "", description: "", totalQuestions: 10, difficulty: "intermediate" });
             toast.success("Job Template created successfully!");
-        } catch (err) {
+        } catch {
             toast.error("Failed to create job template");
         } finally {
             setIsCreating(false);

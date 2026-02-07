@@ -3,7 +3,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import api from "../lib/axios";
-import { useAuth } from "../context/AuthContext";
+import { useAuth, User } from "../context/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
 import { BrainCircuit, Mail, Lock, ArrowRight, Loader2, Star, ShieldCheck, Users } from "lucide-react";
 import { cn } from "../lib/utils";
@@ -24,14 +24,14 @@ export default function Login() {
 
     try {
       setLoading(true);
-      const res = await api.post<{ token: string }>("/auth/login", {
+      const res = await api.post<{ user: User }>("/auth/login", {
         email,
         password,
       });
 
-      login(res.data.token);
+      login(res.data.user);
       toast.success("Welcome back! Loading your dashboard...");
-      navigate("/interviews");
+      navigate(res.data.user.role === "recruiter" ? "/recruiter" : "/interviews");
     } catch (err: unknown) {
       const errorData = (err as { response?: { data?: { message?: string } } }).response?.data;
       const message = errorData?.message || "Invalid credentials. Please verify your email and password.";

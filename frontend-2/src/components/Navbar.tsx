@@ -5,7 +5,7 @@ import { Rocket, LogOut, LayoutDashboard, Briefcase } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Navbar() {
-    const { user, logout, login } = useAuth(); // Destructuring login to use for the dev toggle
+    const { user, logout, switchRole } = useAuth();
     const navigate = useNavigate();
 
     const handleLogout = () => {
@@ -13,13 +13,16 @@ export default function Navbar() {
         toast.info("Logged out successfully. See you soon!");
     }
 
-    // Temporary developer helper to switch roles for testing
-    const switchRole = () => {
+    // Persistent role switcher
+    const handleRoleSwitch = async () => {
         if (!user) return;
-        const newRole = user.role === "candidate" ? "recruiter" : "candidate";
-        login(user.token, newRole);
-        toast.success(`Switched to ${newRole} mode!`);
-        navigate(newRole === "recruiter" ? "/recruiter" : "/interviews");
+        try {
+            const newRole = await switchRole();
+            toast.success(`Switched to ${newRole} mode!`);
+            navigate(newRole === "recruiter" ? "/recruiter" : "/interviews");
+        } catch {
+            toast.error("Failed to switch portal mode");
+        }
     }
 
     return (
@@ -53,7 +56,7 @@ export default function Navbar() {
 
                             <div className="flex items-center gap-3 bg-white/5 py-1.5 pl-4 pr-1.5 rounded-full border border-white/5">
                                 <button
-                                    onClick={switchRole}
+                                    onClick={handleRoleSwitch}
                                     className="text-right hidden sm:block hover:opacity-70 transition-opacity"
                                 >
                                     <p className="text-[10px] font-black leading-none uppercase tracking-tighter text-primary mb-0.5">{user.role}</p>

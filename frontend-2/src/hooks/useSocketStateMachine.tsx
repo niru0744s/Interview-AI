@@ -57,17 +57,15 @@ function socketReducer(state: MachineState, action: Action): MachineState {
   }
 }
 
-export function useSocketStateMachine(url: string, token: string | null) {
+export function useSocketStateMachine(url: string) {
   const [state, dispatch] = useReducer(socketReducer, initialState);
   const socketRef = useRef<Socket | null>(null);
 
   const connect = useCallback(() => {
-    if (!token) return;
-
     dispatch({ type: "INIT_SOCKET" });
 
     const socket = io(url, {
-      auth: { token },
+      withCredentials: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
     });
@@ -101,7 +99,7 @@ export function useSocketStateMachine(url: string, token: string | null) {
     });
 
     socketRef.current = socket;
-  }, [url, token]);
+  }, [url]);
 
   const disconnect = useCallback(() => {
     if (socketRef.current) {

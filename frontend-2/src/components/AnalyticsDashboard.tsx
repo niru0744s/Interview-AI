@@ -111,7 +111,7 @@ export default function AnalyticsDashboard() {
                         <CardDescription className="text-base">Real-time tracking of your technical growth trajectory</CardDescription>
                     </CardHeader>
                     <CardContent className="h-[350px] pr-4">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                             <AreaChart data={stats.performanceTimeline}>
                                 <defs>
                                     <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
@@ -168,7 +168,7 @@ export default function AnalyticsDashboard() {
                         <CardDescription className="text-base">Distribution of your interview results</CardDescription>
                     </CardHeader>
                     <CardContent className="h-[350px] flex flex-col justify-center items-center">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                             <PieChart>
                                 <Pie
                                     data={stats.verdictDistribution}
@@ -219,7 +219,7 @@ export default function AnalyticsDashboard() {
                     </div>
                 </CardHeader>
                 <CardContent className="h-[350px] pt-4">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                         <BarChart data={stats.rolePerformance} layout="vertical">
                             <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="oklch(var(--border) / 0.5)" />
                             <XAxis type="number" domain={[0, 10]} fontSize={12} hide />

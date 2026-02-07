@@ -1,41 +1,47 @@
+const { generateDetailedSummary } = require("./ai.service");
+
 exports.generateAISummary = async (interviewPayload) => {
   const {
     totalQuestions,
     answers,
     status,
+    role,
+    topic
   } = interviewPayload;
 
-  const answeredCount = answers.filter(a => !a.isSkipped).length;
-  const skippedCount = answers.filter(a => a.isSkipped).length;
+  try {
+    const questionsAndAnswers = answers.map(a => ({
+      question: a.question,
+      answer: a.answer,
+      score: a.score || 0
+    }));
 
-  // Sum up the actual scores from each answer
-  const totalScore = answers.reduce((sum, ans) => sum + (ans.score || 0), 0);
-  const maxPossibleScore = totalQuestions * 10;
+    const aiResult = await generateDetailedSummary({
+      role: role || "Software Engineer",
+      topic: topic || "Technical",
+      questionsAndAnswers,
+      status
+    });
 
-  const completionRatio = answeredCount / totalQuestions;
-  const performanceRatio = answeredCount > 0 ? totalScore / (answeredCount * 10) : 0;
+    return aiResult;
+  } catch (err) {
+    console.error("AI Summary generation failed, falling back to heuristics:", err);
 
-  // Final score is the sum of points
-  let score = totalScore;
-  let verdict = "borderline";
+    // Heuristic Fallback
+    const answeredCount = answers.filter(a => !a.isSkipped).length;
+    const totalScore = answers.reduce((sum, ans) => sum + (ans.score || 0), 0);
+    const performanceRatio = answeredCount > 0 ? totalScore / (answeredCount * 10) : 0;
 
-  if (performanceRatio > 0.8 && completionRatio > 0.8) verdict = "hire";
-  else if (performanceRatio < 0.5 || completionRatio < 0.5) verdict = "reject";
+    let verdict = "borderline";
+    if (performanceRatio > 0.8) verdict = "hire";
+    else if (performanceRatio < 0.5) verdict = "reject";
 
-  const strengths = answers.flatMap(a => a.strengths || []).slice(0, 3);
-  const weaknesses = answers.flatMap(a => a.missing_points || []).slice(0, 3);
-
-  if (status === "quit") {
-    weaknesses.push("Interview was not completed");
+    return {
+      score: totalScore,
+      verdict,
+      strengths: ["Consistency in answering"],
+      weaknesses: ["Opportunity for deeper technical detail"],
+      feedback: `You answered ${answeredCount} questions. Your average quality was ${Math.round(performanceRatio * 100)}%.`
+    };
   }
-
-  return {
-    score,
-    verdict,
-    strengths: strengths.length > 0 ? strengths : ["Consistency in answering"],
-    weaknesses: weaknesses.length > 0 ? weaknesses : ["Opportunity for deeper technical detail"],
-    feedback: status === "quit"
-      ? "The interview ended early. While your answers showed promise, completing the full set of questions is recommended for a definitive evaluation."
-      : `You answered ${answeredCount} questions, skipped ${skippedCount}, out of ${totalQuestions} total. Your average quality was ${Math.round(performanceRatio * 100)}%. ${performanceRatio > 0.7 ? "Great job!" : "Keep practicing to improve your technical depth."}`
-  };
 };

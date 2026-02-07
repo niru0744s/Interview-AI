@@ -2,8 +2,6 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
     Card,
-    CardContent,
-    CardHeader,
     CardTitle,
     CardDescription
 } from "../components/ui/card";
@@ -15,18 +13,26 @@ import {
     Clock,
     FileText,
     CheckCircle2,
-    AlertCircle,
     Loader2,
-    ChevronRight
 } from "lucide-react";
 import api from "../lib/axios";
 import { cn } from "../lib/utils";
 import { toast } from "sonner";
 
+interface Candidate {
+    _id: string;
+    userId: {
+        email: string;
+    };
+    status: string;
+    totalScore: number;
+    totalQuestions: number;
+}
+
 export default function JobResults() {
-    const { templateId } = useParams();
+    const { templateId } = useParams<{ templateId: string }>();
     const navigate = useNavigate();
-    const [candidates, setCandidates] = useState<any[]>([]);
+    const [candidates, setCandidates] = useState<Candidate[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -34,7 +40,7 @@ export default function JobResults() {
             try {
                 const res = await api.get(`/templates/${templateId}/candidates`);
                 setCandidates(res.data);
-            } catch (err) {
+            } catch {
                 toast.error("Failed to load candidate results");
             } finally {
                 setLoading(false);
@@ -136,7 +142,7 @@ export default function JobResults() {
                                                         candidate.status === "in_progress" ? "bg-blue-500/10 text-blue-500 border border-blue-500/20" :
                                                             "bg-orange-500/10 text-orange-500 border border-orange-500/20"
                                                 )}>
-                                                    {candidate.status === "Completed" ? <CheckCircle2 className="h-3 w-3" /> : <AlertCircle className="h-3 w-3" />}
+                                                    {candidate.status === "Completed" ? <CheckCircle2 className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
                                                     {candidate.status.replace("_", " ")}
                                                 </div>
                                             </td>
@@ -145,7 +151,7 @@ export default function JobResults() {
                                                     <div className="flex-1 max-w-[100px] h-2 bg-muted rounded-full overflow-hidden">
                                                         <div
                                                             className="h-full bg-primary glow-primary"
-                                                            style={{ width: `${(candidate.totalScore / (candidate.totalQuestions * 10)) * 100}%` }}
+                                                            style={{ width: `${(candidate.totalScore / (candidate.totalQuestions * 10 || 1)) * 100}%` }}
                                                         />
                                                     </div>
                                                     <span className="text-lg font-black text-foreground">

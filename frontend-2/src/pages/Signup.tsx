@@ -32,15 +32,15 @@ export default function Signup() {
 
         try {
             setLoading(true);
-            const res = await api.post<{ token: string }>("/auth/register", {
+            const res = await api.post<{ user: { email: string, role: "candidate" | "recruiter" } }>("/auth/register", {
                 name,
                 email,
                 password,
             });
 
-            login(res.data.token, "candidate");
+            login(res.data.user);
             toast.success("Account created! Let's start practicing.");
-            navigate("/interviews");
+            navigate(res.data.user.role === "recruiter" ? "/recruiter" : "/interviews");
         } catch (err: unknown) {
             const errorData = (err as { response?: { data?: { message?: string } } }).response?.data;
             const message = errorData?.message || "Registration failed. Try a different email.";

@@ -3,37 +3,52 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Rocket, Briefcase, ChevronRight, AlertCircle, Loader2 } from "lucide-react";
+import axios from "axios";
 import api from "../lib/axios";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
 
+interface Template {
+    _id: string;
+    title: string;
+    role: string;
+    topic: string;
+    description?: string;
+    totalQuestions: number;
+    difficulty: string;
+}
+
 export default function InvitePage() {
-    const { code } = useParams();
+    const { code } = useParams<{ code: string }>();
     const navigate = useNavigate();
     const { user } = useAuth();
 
-    const [template, setTemplate] = useState<any>(null);
+    const [template, setTemplate] = useState<Template | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isJoining, setIsJoining] = useState(false);
 
     useEffect(() => {
+        const fetchTemplate = async () => {
+            try {
+                setLoading(true);
+                const res = await api.get(`/templates/invite/${code}`);
+                setTemplate(res.data);
+            } catch (err: unknown) {
+                if (axios.isAxiosError(err)) {
+                    setError(err.response?.data?.error || "Invalid invitation link");
+                } else {
+                    setError("An unexpected error occurred");
+                }
+            } finally {
+                setLoading(false);
+            }
+        };
+
         if (code) {
             fetchTemplate();
         }
     }, [code]);
-
-    const fetchTemplate = async () => {
-        try {
-            setLoading(true);
-            const res = await api.get(`/templates/invite/${code}`);
-            setTemplate(res.data);
-        } catch (err: any) {
-            setError(err.response?.data?.error || "Invalid invitation link");
-        } finally {
-            setLoading(false);
-        }
-    };
 
     const handleJoin = async () => {
         if (!user) {
@@ -41,6 +56,8 @@ export default function InvitePage() {
             navigate("/login", { state: { from: `/invite/${code}` } });
             return;
         }
+
+        if (!template) return;
 
         try {
             setIsJoining(true);
@@ -54,7 +71,7 @@ export default function InvitePage() {
 
             toast.success("Interview session initialized!");
             navigate(`/interview/${res.data.interviewId}`);
-        } catch (err) {
+        } catch {
             toast.error("Failed to join interview session");
         } finally {
             setIsJoining(false);
@@ -70,7 +87,7 @@ export default function InvitePage() {
         );
     }
 
-    if (error) {
+    if (error || !template) {
         return (
             <div className="min-h-[80vh] flex items-center justify-center p-6">
                 <Card className="glass-card border-white/10 w-full max-w-md p-10 text-center space-y-6">
@@ -79,7 +96,7 @@ export default function InvitePage() {
                     </div>
                     <div className="space-y-2">
                         <h1 className="text-3xl font-black">Invitation Error</h1>
-                        <p className="text-muted-foreground font-medium">{error}</p>
+                        <p className="text-muted-foreground font-medium">{error || "Template not found"}</p>
                     </div>
                     <Button onClick={() => navigate("/")} className="w-full h-12 rounded-xl font-black uppercase tracking-widest">
                         Back Home

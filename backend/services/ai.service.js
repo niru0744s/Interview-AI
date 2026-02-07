@@ -144,3 +144,48 @@ Candidate Answer: ${answer}
     throw new Error("AI returned invalid evaluation format");
   }
 };
+
+exports.generateDetailedSummary = async ({ role, topic, questionsAndAnswers, status }) => {
+  const systemPrompt = `
+You are a senior technical hiring manager reviewing an interview session for a ${role} position.
+The interview topic was: ${topic}.
+
+Rules:
+- Provide a professional, objective technical evaluation.
+- Identify specific technical strengths based on their answers.
+- Identify specific areas for improvement.
+- Provide a final hiring verdict.
+
+Return ONLY valid JSON in this exact format:
+{
+  "score": number (0-100 total based on average performace),
+  "verdict": "hire" | "borderline" | "reject",
+  "strengths": string[],
+  "weaknesses": string[],
+  "feedback": "Detailed paragraph of constructive feedback"
+}
+`;
+
+  const userPrompt = `
+Interview Status: ${status}
+Transcript:
+${questionsAndAnswers.map((qa, i) => `Q${i + 1}: ${qa.question}\nA${i + 1}: ${qa.answer}\nScore: ${qa.score}/10`).join("\n\n")}
+
+Generate the detailed technical summary.
+`;
+
+  const response = await client.chat.completions.create({
+    model: "sonar",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt }
+    ],
+    temperature: 0.3
+  });
+
+  let content = response.choices[0].message.content;
+  const jsonMatch = content.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error("AI failed to return summary JSON");
+
+  return JSON.parse(jsonMatch[0]);
+};

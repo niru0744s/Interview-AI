@@ -26,12 +26,12 @@ export const router = createBrowserRouter([
     },
     {
         path: "/recruiter",
-        element: (<ProtectedRoute><Layout><RecruiterDashboard /></Layout></ProtectedRoute>),
+        element: (<ProtectedRoute role="recruiter"><Layout><RecruiterDashboard /></Layout></ProtectedRoute>),
         errorElement: <RouteError />
     },
     {
         path: "/job/:templateId/results",
-        element: (<ProtectedRoute><Layout><JobResults /></Layout></ProtectedRoute>),
+        element: (<ProtectedRoute role="recruiter"><Layout><JobResults /></Layout></ProtectedRoute>),
         errorElement: <RouteError />
     },
     {
@@ -45,7 +45,7 @@ export const router = createBrowserRouter([
 
     {
         path: "/interviews",
-        element: (<ProtectedRoute><Layout><Interviews /></Layout></ProtectedRoute>),
+        element: (<ProtectedRoute role="candidate"><Layout><Interviews /></Layout></ProtectedRoute>),
         errorElement: <RouteError />
     },
     {

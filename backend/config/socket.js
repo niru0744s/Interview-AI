@@ -1,11 +1,14 @@
 const { startInterview, nextQuestion, submitAnswer, skipQuestion } = require("../services/interview.service");
 const jwt = require("jsonwebtoken");
+const cookie = require("cookie");
 
 exports.initSocket = (io) => {
 
     io.use((socket, next) => {
         try {
-            const token = socket.handshake.auth?.token;
+            const cookies = cookie.parse(socket.handshake.headers.cookie || "");
+            const token = cookies.token || socket.handshake.auth?.token;
+
             if (!token) {
                 return next(new Error("Unauthorized"));
             }
@@ -18,6 +21,7 @@ exports.initSocket = (io) => {
             next(new Error("Unauthorized"));
         }
     });
+
 
 
     io.on("connection", socket => {

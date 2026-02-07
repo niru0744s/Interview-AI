@@ -1,15 +1,17 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import api from "../lib/axios";
 
-type User = {
-    token: string;
+export type User = {
     role: "candidate" | "recruiter";
+    email?: string;
 };
 
 type AuthContextType = {
     user: User | null;
     loading: boolean;
-    login: (token: string, role: "candidate" | "recruiter") => void;
+    login: (user: User) => void;
     logout: () => void;
+    switchRole: () => Promise<"candidate" | "recruiter">;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -23,29 +25,48 @@ export const AuthProvider = ({ children }: AuthContextProps) => {
     const [loading, setLoading] = useState<boolean>(true);
 
     useEffect(() => {
-        const token = localStorage.getItem("token");
-        const role = localStorage.getItem("role") as "candidate" | "recruiter";
-        if (token && role) {
-            setUser({ token, role });
-        }
+        const checkAuth = async () => {
+            try {
+                const res = await api.get("/auth/me");
+                setUser(res.data.user);
+            } catch {
+                setUser(null);
+            } finally {
+                setLoading(false);
+            }
+        };
 
-        setLoading(false);
+        checkAuth();
     }, []);
 
-    const login = (token: string, role: "candidate" | "recruiter" = "candidate"): void => {
-        localStorage.setItem("token", token);
-        localStorage.setItem("role", role);
-        setUser({ token, role });
+    const login = (userData: User): void => {
+        setUser(userData);
     };
 
-    const logout = (): void => {
-        localStorage.removeItem("token");
-        localStorage.removeItem("role");
-        setUser(null);
+    const logout = async (): Promise<void> => {
+        try {
+            await api.post("/auth/logout");
+        } catch {
+            console.error("Logout failed");
+        } finally {
+            setUser(null);
+        }
+    };
+
+    const switchRole = async (): Promise<"candidate" | "recruiter"> => {
+        try {
+            const res = await api.post("/auth/switch-role");
+            const newRole = res.data.role;
+            setUser(prev => prev ? { ...prev, role: newRole } : null);
+            return newRole;
+        } catch (err) {
+            console.error("Failed to switch role", err);
+            throw err;
+        }
     };
 
     return (
-        <AuthContext.Provider value={{ user, loading, login, logout }}>
+        <AuthContext.Provider value={{ user, loading, login, logout, switchRole }}>
             {children}
         </AuthContext.Provider>
     )
@@ -54,7 +75,7 @@ export const AuthProvider = ({ children }: AuthContextProps) => {
 export const useAuth = (): AuthContextType => {
     const context = useContext(AuthContext);
     if (!context) {
-        throw new Error("useAuth must be used within an AUthProvider");
+        throw new Error("useAuth must be used within an AuthProvider");
     }
 
     return context;

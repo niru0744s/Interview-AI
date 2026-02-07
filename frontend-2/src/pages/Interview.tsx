@@ -3,7 +3,6 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import api from "../lib/axios";
 import { useSocketStateMachine } from "../hooks/useSocketStateMachine";
-import { useAuth } from "../context/AuthContext";
 import InterviewHeader from "../components/interview/InterviewHeader";
 import InterviewLiveArea from "../components/interview/InterviewLiveArea";
 import { toast } from "sonner";
@@ -28,7 +27,7 @@ type InterviewDetails = {
 export default function Interview() {
   const { interviewId } = useParams<RouteParams>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+
 
   const [question, setQuestion] = useState<InterviewQuestion | null>(null);
   const [details, setDetails] = useState<InterviewDetails | null>(null);
@@ -41,8 +40,7 @@ export default function Interview() {
   const [optimisticAnswer, setOptimisticAnswer] = useState<string | null>(null);
 
   const { status, socket, error: socketError } = useSocketStateMachine(
-    import.meta.env.VITE_BACKEND_URL || "http://localhost:5000",
-    user?.token || null
+    import.meta.env.VITE_BACKEND_URL
   );
 
   const fetchDetails = useCallback(async () => {
