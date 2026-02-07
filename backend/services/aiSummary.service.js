@@ -37,7 +37,7 @@ exports.generateAISummary = async (interviewPayload) => {
     else if (performanceRatio < 0.5) verdict = "reject";
 
     return {
-      score: totalScore,
+      score: Math.round(performanceRatio * 100),
       verdict,
       strengths: ["Consistency in answering"],
       weaknesses: ["Opportunity for deeper technical detail"],

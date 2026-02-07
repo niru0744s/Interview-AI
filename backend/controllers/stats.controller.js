@@ -32,7 +32,7 @@ exports.getUserStatsController = async (req, res) => {
                                     $avg: {
                                         $divide: [
                                             "$score",
-                                            { $ifNull: ["$interviewData.totalQuestions", 10] }
+                                            10
                                         ]
                                     }
                                 }
@@ -46,7 +46,7 @@ exports.getUserStatsController = async (req, res) => {
                                 score: {
                                     $divide: [
                                         "$score",
-                                        { $ifNull: ["$interviewData.totalQuestions", 10] }
+                                        10
                                     ]
                                 },
                                 date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }
@@ -59,12 +59,12 @@ exports.getUserStatsController = async (req, res) => {
                     roles: [
                         {
                             $group: {
-                                _id: "$interviewData.role",
+                                _id: { $trim: { input: "$interviewData.role" } },
                                 avgNormalizedScore: {
                                     $avg: {
                                         $divide: [
                                             "$score",
-                                            { $ifNull: ["$interviewData.totalQuestions", 10] }
+                                            10
                                         ]
                                     }
                                 },

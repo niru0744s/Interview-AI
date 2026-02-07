@@ -86,7 +86,7 @@ export default function AnalyticsDashboard() {
                     { title: "Average Score", val: `${stats.averageScore}/10`, sub: "Overall ranking", icon: <Target className="h-5 w-5" />, color: "text-blue-500", bg: "bg-blue-500/10" },
                     { title: "Total Sessions", val: stats.totalSessions, sub: `${stats.completedSessions} completed`, icon: <Activity className="h-5 w-5" />, color: "text-primary", bg: "bg-primary/10" },
                     { title: "Top Specialist", val: stats.rolePerformance[0]?.role || "N/A", sub: "Peak performance", icon: <Briefcase className="h-5 w-5" />, color: "text-purple-500", bg: "bg-purple-500/10" },
-                    { title: "Improvement", val: `${improvement > 0 ? '+' : ''}${improvement}%`, sub: "Since inception", icon: <TrendingUp className="h-5 w-5" />, color: "text-green-500", bg: "bg-green-500/10" },
+                    { title: "Improvement", val: `${improvement > 0 ? '+' : ''}${Math.abs(improvement)}%`, sub: "Since inception", icon: <TrendingUp className="h-5 w-5" />, color: "text-green-500", bg: "bg-green-500/10" },
                 ].map((item, i) => (
                     <Card key={i} className="glass-card border-white/5 overflow-hidden">
                         <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
@@ -130,6 +130,7 @@ export default function AnalyticsDashboard() {
                                 />
                                 <YAxis
                                     domain={[0, 10]}
+                                    ticks={[0, 2, 4, 6, 8, 10]}
                                     fontSize={12}
                                     fontWeight={600}
                                     tickLine={false}
@@ -236,11 +237,13 @@ export default function AnalyticsDashboard() {
                             <Tooltip
                                 cursor={{ fill: 'rgba(0, 0, 0, 0.04)' }}
                                 contentStyle={{
-                                    backgroundColor: 'oklch(var(--card))',
-                                    borderRadius: "16px",
-                                    border: "1px solid oklch(var(--border))",
-                                    boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
+                                    backgroundColor: '#1f2937',
+                                    borderRadius: "8px",
+                                    border: "none",
+                                    fontWeight: "bold",
+                                    color: '#f3f4f6'
                                 }}
+                                itemStyle={{ color: '#f3f4f6' }}
                             />
                             <Bar
                                 dataKey="avgScore"
