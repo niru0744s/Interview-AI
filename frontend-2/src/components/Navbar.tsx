@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
 import { useAuth } from "../context/AuthContext";
-import { Rocket, LogOut, LayoutDashboard, Briefcase } from "lucide-react";
+import { Rocket, LogOut, LayoutDashboard, Briefcase, Settings } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Navbar() {
@@ -63,12 +63,22 @@ export default function Navbar() {
                                     <p className="text-[8px] font-bold leading-none text-muted-foreground">Switch</p>
                                 </button>
 
+                                <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => navigate("/settings")}
+                                    className="h-8 w-8 rounded-full hover:bg-white/10 transition-all"
+                                    title="Settings"
+                                >
+                                    <Settings className="h-4 w-4" />
+                                </Button>
 
                                 <Button
                                     size="icon"
                                     variant="ghost"
                                     onClick={handleLogout}
                                     className="h-8 w-8 rounded-full hover:bg-destructive/10 hover:text-destructive transition-all"
+                                    title="Logout"
                                 >
                                     <LogOut className="h-4 w-4" />
                                 </Button>
@@ -86,6 +96,6 @@ export default function Navbar() {
                     )}
                 </div>
             </div>
-        </nav>
+        </nav >
     );
 }

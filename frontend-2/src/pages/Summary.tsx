@@ -94,7 +94,7 @@ export default function Summary() {
 
     if (!summary) return null;
 
-    const percentage = summary.score && totalQuestions ? (summary.score / (totalQuestions * 10)) * 100 : 0;
+    const percentage = summary.score || 0;
 
     return (
         <div className="max-w-3xl mx-auto p-6 space-y-10 py-12 animate-in fade-in slide-in-from-bottom-4 duration-700">

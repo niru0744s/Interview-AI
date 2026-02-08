@@ -9,7 +9,7 @@ interface ReviewSummaryHeaderProps {
 }
 
 export default function ReviewSummaryHeader({ score, totalQuestions, verdict, feedback }: ReviewSummaryHeaderProps) {
-    const percentage = (score / (totalQuestions * 10)) * 100;
+    const percentage = score;
 
     return (
         <Card className="glass-card border-white/5 overflow-hidden">
@@ -27,7 +27,7 @@ export default function ReviewSummaryHeader({ score, totalQuestions, verdict, fe
                         </CardDescription>
                     </div>
                     <div className="bg-primary text-white px-6 py-2 rounded-2xl font-black text-xl shadow-lg glow-primary">
-                        Score: {score}<span className="text-white/50 text-base">/{totalQuestions * 10}</span>
+                        Score: {score}<span className="text-white/50 text-base">/100</span>
                     </div>
                 </div>
             </CardHeader>

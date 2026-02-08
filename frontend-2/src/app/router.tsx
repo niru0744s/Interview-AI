@@ -11,6 +11,10 @@ import ReviewSession from "../pages/ReviewSession";
 import RecruiterDashboard from "../pages/RecruiterDashboard";
 import InvitePage from "../pages/InvitePage";
 import JobResults from "../pages/JobResults";
+import VerifyEmail from "../pages/VerifyEmail";
+import ForgotPassword from "../pages/ForgotPassword";
+import ResetPassword from "../pages/ResetPassword";
+import Settings from "../pages/Settings";
 
 import Layout from "../components/Layout";
 
@@ -42,6 +46,25 @@ export const router = createBrowserRouter([
         path: "/signup",
         element: <Layout><Signup /></Layout>
     },
+    {
+        path: "/verify-email",
+        element: <Layout><VerifyEmail /></Layout>
+    },
+    {
+        path: "/forgot-password",
+        element: <Layout><ForgotPassword /></Layout>,
+        errorElement: <RouteError />
+    },
+    {
+        path: "/reset-password",
+        element: <Layout><ResetPassword /></Layout>,
+        errorElement: <RouteError />
+    },
+    {
+        path: "/settings",
+        element: <Layout><Settings /></Layout>,
+        errorElement: <RouteError />
+    },
 
     {
         path: "/interviews",
@@ -68,4 +91,3 @@ export const router = createBrowserRouter([
         element: <Navigate to="/" replace />
     }
 ]);
-

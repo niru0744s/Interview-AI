@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../co
 import api from "../lib/axios";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
-import { BrainCircuit, User, Mail, Lock, ArrowRight, Loader2, Sparkles, Trophy, Rocket, ShieldCheck } from "lucide-react";
+import { BrainCircuit, User, Mail, Lock, ArrowRight, Loader2, Sparkles, Trophy, Rocket, ShieldCheck, Eye, EyeOff, Check, X } from "lucide-react";
 import { cn } from "../lib/utils";
 import { toast } from "sonner";
 
@@ -13,11 +13,38 @@ export default function Signup() {
     const [name, setName] = useState<string>("");
     const [email, setEmail] = useState<string>("");
     const [password, setPassword] = useState<string>("");
+    const [showPassword, setShowPassword] = useState<boolean>(false);
+    const [strength, setStrength] = useState<number>(0);
+    const [requirements, setRequirements] = useState({
+        length: false,
+        upper: false,
+        number: false,
+        special: false
+    });
+
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
-    const { login } = useAuth();
+    const { } = useAuth();
     const navigate = useNavigate();
+
+    const checkStrength = (pass: string) => {
+        let score = 0;
+        const reqs = {
+            length: pass.length >= 8,
+            upper: /[A-Z]/.test(pass),
+            number: /[0-9]/.test(pass),
+            special: /[^A-Za-z0-9]/.test(pass)
+        };
+
+        if (reqs.length) score += 25;
+        if (reqs.upper) score += 25;
+        if (reqs.number) score += 25;
+        if (reqs.special) score += 25;
+
+        setStrength(score);
+        setRequirements(reqs);
+    };
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
         e.preventDefault();
@@ -25,6 +52,13 @@ export default function Signup() {
 
         if (!name || !email || !password) {
             const msg = "Please fill in all fields";
+            setError(msg);
+            toast.warning(msg);
+            return;
+        }
+
+        if (strength < 100) {
+            const msg = "Password is too weak. Please meet all requirements.";
             setError(msg);
             toast.warning(msg);
             return;
@@ -38,9 +72,10 @@ export default function Signup() {
                 password,
             });
 
-            login(res.data.user);
-            toast.success("Account created! Let's start practicing.");
-            navigate(res.data.user.role === "recruiter" ? "/recruiter" : "/interviews");
+            if (res.data.user) {
+                toast.success("Account created! Please check your email to verify.");
+                navigate("/login");
+            }
         } catch (err: unknown) {
             const errorData = (err as { response?: { data?: { message?: string } } }).response?.data;
             const message = errorData?.message || "Registration failed. Try a different email.";
@@ -145,13 +180,59 @@ export default function Signup() {
                                     <div className="relative group/field">
                                         <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within/field:text-primary transition-colors" />
                                         <Input
-                                            type="password"
+                                            type={showPassword ? "text" : "password"}
                                             placeholder="Password"
                                             value={password}
-                                            onChange={(e) => setPassword(e.target.value)}
-                                            className="pl-12 h-14 rounded-2xl bg-background/50 border-white/10 focus:ring-primary/20 transition-all font-medium"
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                setPassword(val);
+                                                checkStrength(val);
+                                            }}
+                                            className="pl-12 pr-12 h-14 rounded-2xl bg-background/50 border-white/10 focus:ring-primary/20 transition-all font-medium"
                                             required
                                         />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary transition-colors"
+                                        >
+                                            {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                        </button>
+                                    </div>
+
+                                    {/* Password Strength Meter */}
+                                    <div className="space-y-3 p-4 rounded-xl bg-white/5 border border-white/5">
+                                        <div className="flex justify-between items-center text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                                            <span>Strength</span>
+                                            <span className={cn(
+                                                strength <= 40 ? "text-red-500" : strength <= 80 ? "text-yellow-500" : "text-green-500"
+                                            )}>
+                                                {strength <= 40 ? "Weak" : strength <= 80 ? "Medium" : "Strong"}
+                                            </span>
+                                        </div>
+                                        <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+                                            <div
+                                                className={cn("h-full transition-all duration-500 ease-out",
+                                                    strength <= 40 ? "bg-red-500" : strength <= 80 ? "bg-yellow-500" : "bg-green-500"
+                                                )}
+                                                style={{ width: `${strength}%` }}
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {[
+                                                { label: "8+ Characters", met: requirements.length },
+                                                { label: "Uppercase", met: requirements.upper },
+                                                { label: "Number", met: requirements.number },
+                                                { label: "Special Char", met: requirements.special },
+                                            ].map((req, i) => (
+                                                <div key={i} className={cn("flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors",
+                                                    req.met ? "text-green-500" : "text-muted-foreground/50"
+                                                )}>
+                                                    {req.met ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
+                                                    {req.label}
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
 

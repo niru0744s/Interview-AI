@@ -5,13 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../co
 import api from "../lib/axios";
 import { useAuth, User } from "../context/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
-import { BrainCircuit, Mail, Lock, ArrowRight, Loader2, Star, ShieldCheck, Users } from "lucide-react";
+import { BrainCircuit, Mail, Lock, ArrowRight, Loader2, Star, ShieldCheck, Users, Eye, EyeOff } from "lucide-react";
 import { cn } from "../lib/utils";
 import { toast } from "sonner";
 
 export default function Login() {
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
+  const [showPassword, setShowPassword] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -136,15 +137,48 @@ export default function Login() {
                   <div className="relative group/field">
                     <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within/field:text-primary transition-colors" />
                     <Input
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       placeholder="Password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="pl-12 h-14 rounded-2xl bg-background/50 border-white/10 focus:ring-primary/20 transition-all font-medium"
+                      className="pl-12 pr-12 h-14 rounded-2xl bg-background/50 border-white/10 focus:ring-primary/20 transition-all font-medium"
                       required
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </button>
+                    <div className="flex justify-end">
+                      <Link
+                        to="/forgot-password"
+                        className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
+                      >
+                        Forgot password?
+                      </Link>
+                    </div>
                   </div>
                 </div>
+
+                {error && error.includes("not verified") && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full border-yellow-500/20 text-yellow-500 hover:bg-yellow-500/10"
+                    onClick={async () => {
+                      try {
+                        await api.post("/auth/resend-verification", { email });
+                        toast.success("Verification email sent!");
+                      } catch (e) {
+                        toast.error("Failed to resend email.");
+                      }
+                    }}
+                  >
+                    Resend Verification Email
+                  </Button>
+                )}
 
                 <Button
                   type="submit"
