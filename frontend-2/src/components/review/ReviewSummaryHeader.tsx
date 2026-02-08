@@ -3,12 +3,11 @@ import { Award } from "lucide-react";
 
 interface ReviewSummaryHeaderProps {
     score: number;
-    totalQuestions: number;
     verdict: string;
     feedback: string;
 }
 
-export default function ReviewSummaryHeader({ score, totalQuestions, verdict, feedback }: ReviewSummaryHeaderProps) {
+export default function ReviewSummaryHeader({ score, verdict, feedback }: ReviewSummaryHeaderProps) {
     const percentage = score;
 
     return (

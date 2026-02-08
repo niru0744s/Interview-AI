@@ -99,7 +99,6 @@ export default function ReviewSession() {
             {data.summary && (
                 <ReviewSummaryHeader
                     score={data.summary.score}
-                    totalQuestions={data.interview.totalQuestions}
                     verdict={data.summary.verdict}
                     feedback={data.summary.feedback}
                 />

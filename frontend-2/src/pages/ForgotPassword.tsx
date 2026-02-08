@@ -4,7 +4,7 @@ import { Input } from "../components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import api from "../lib/axios";
 import { Link } from "react-router-dom";
-import { Mail, ArrowRight, Loader2, ArrowLeft } from "lucide-react";
+import { Mail, Loader2, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "../lib/utils";
 

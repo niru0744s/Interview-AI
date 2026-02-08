@@ -4,7 +4,7 @@ import { Input } from "../components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import api from "../lib/axios";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { Lock, Eye, EyeOff, Loader2, ArrowRight, Check, X } from "lucide-react";
+import { Lock, Eye, EyeOff, Loader2, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "../lib/utils";
 

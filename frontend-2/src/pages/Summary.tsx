@@ -19,7 +19,6 @@ type SummaryResponse = {
     interview: {
         role: string;
         topic: string;
-        totalQuestions: number;
     };
 };
 
@@ -33,7 +32,6 @@ export default function Summary() {
     const isFetching = useRef(false);
 
     const [summary, setSummary] = useState<InterviewSummary | null>(null);
-    const [totalQuestions, setTotalQuestions] = useState<number>(0);
     const [meta, setMeta] = useState<{ role: string; topic: string } | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
@@ -46,7 +44,6 @@ export default function Summary() {
             try {
                 const res = await api.post<SummaryResponse>(`/interview/${interviewId}/summary`);
                 setSummary(res.data.summary);
-                setTotalQuestions(res.data.interview.totalQuestions);
                 setMeta({ role: res.data.interview.role, topic: res.data.interview.topic });
             } catch (err: unknown) {
                 console.error("Fetch summary error:", err);
