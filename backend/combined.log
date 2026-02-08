@@ -1,0 +1,16 @@
+{"level":"info","message":"Database Is connected...","timestamp":"2026-02-08T06:12:31.772Z"}
+{"level":"info","message":"GET /api/auth/me","timestamp":"2026-02-08T06:13:06.434Z"}
+{"level":"info","message":"GET /api/auth/me","timestamp":"2026-02-08T06:13:06.592Z"}
+{"level":"info","message":"POST /api/auth/register","timestamp":"2026-02-08T06:14:05.688Z"}
+{"level":"info","message":"GET /api/auth/verify-email?token=f1df997ec7bae2043577628e769a45ae1e93d9a8812a7f6a204b472639e24277","timestamp":"2026-02-08T06:14:42.799Z"}
+{"level":"info","message":"GET /api/auth/me","timestamp":"2026-02-08T06:14:42.808Z"}
+{"level":"info","message":"GET /api/auth/me","timestamp":"2026-02-08T06:14:43.001Z"}
+{"level":"info","message":"POST /api/auth/login","timestamp":"2026-02-08T06:15:00.847Z"}
+{"level":"info","message":"GET /api/interview","timestamp":"2026-02-08T06:15:01.358Z"}
+{"level":"info","message":"GET /api/interview","timestamp":"2026-02-08T06:15:01.461Z"}
+{"level":"info","message":"POST /api/auth/switch-role","timestamp":"2026-02-08T06:15:12.508Z"}
+{"level":"info","message":"GET /api/templates/my","timestamp":"2026-02-08T06:15:12.681Z"}
+{"level":"info","message":"GET /api/templates/stats","timestamp":"2026-02-08T06:15:12.689Z"}
+{"level":"info","message":"GET /api/templates/my","timestamp":"2026-02-08T06:15:12.772Z"}
+{"level":"info","message":"GET /api/templates/stats","timestamp":"2026-02-08T06:15:12.881Z"}
+{"level":"info","message":"POST /api/auth/logout","timestamp":"2026-02-08T06:15:18.547Z"}
