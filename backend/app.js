@@ -17,9 +17,19 @@ app.set('trust proxy', 1);
 // Security Middleware
 app.use(helmet());
 app.use(cookieParser());
+const allowedOrigins = [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    process.env.FRONTEND_URL
+].filter(Boolean);
+
 app.use(cors({
-    origin: [process.env.FRONTEND_URL, "http://localhost:5173"].filter(Boolean),
-    credentials: true
+    origin: allowedOrigins,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    exposedHeaders: ['Content-Length', 'Authorization'],
+    optionsSuccessStatus: 200
 }));
 
 const limiter = rateLimit({
