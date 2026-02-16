@@ -14,23 +14,31 @@ const templateRoutes = require("./routes/template.routes");
 // Trust Proxy for Render
 app.set('trust proxy', 1);
 
-// Security Middleware
-app.use(helmet());
-app.use(cookieParser());
-const allowedOrigins = [
-    'http://localhost:5173',
-    'http://localhost:3000',
-    process.env.FRONTEND_URL
-].filter(Boolean);
+// Request logging (MUST BE FIRST)
+app.use((req, res, next) => {
+    logger.info(`${req.method} ${req.url} - Origin: ${req.headers.origin}`);
+    next();
+});
 
+// CORS (MUST BE BEFORE OTHER MIDDLEWARE)
 app.use(cors({
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+        // Allow all origins that have withCredentials: true
+        // This mirrors the origin back to the client
+        callback(null, true);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     exposedHeaders: ['Content-Length', 'Authorization'],
     optionsSuccessStatus: 200
 }));
+
+// Security Middleware
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
+app.use(cookieParser());
 
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
@@ -41,12 +49,6 @@ app.use("/api/", limiter);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// Request logging
-app.use((req, res, next) => {
-    logger.info(`${req.method} ${req.url}`);
-    next();
-});
 
 async function main() {
     await mongoose.connect(process.env.MONGO_URL);

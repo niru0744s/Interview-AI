@@ -34,8 +34,17 @@ export default function Login() {
       toast.success("Welcome back! Loading your dashboard...");
       navigate(res.data.user.role === "recruiter" ? "/recruiter" : "/interviews");
     } catch (err: unknown) {
-      const errorData = (err as { response?: { data?: { message?: string } } }).response?.data;
-      const message = errorData?.message || "Invalid credentials. Please verify your email and password.";
+      const axiosError = err as { response?: { data?: { message?: string } } };
+      let message = "An unexpected error occurred. Please try again.";
+
+      if (axiosError.response) {
+        // Server responded with an error
+        message = axiosError.response.data?.message || "Invalid credentials. Please verify your email and password.";
+      } else if ((err as any).request) {
+        // Request was made but no response received (Network error/CORS)
+        message = "Unable to connect to server. Please check your internet connection or try again later.";
+      }
+
       setError(message);
       toast.error(message);
     } finally {
