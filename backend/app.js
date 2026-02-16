@@ -1,5 +1,6 @@
 const express = require("express");
 const app = express();
+app.set('trust proxy', 1);
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
@@ -11,27 +12,15 @@ const interviewRoutes = require("./routes/interview.routes");
 const userAuth = require("./routes/auth.routes");
 const templateRoutes = require("./routes/template.routes");
 
-// Trust Proxy for Render
-app.set('trust proxy', 1);
-
-// Request logging (MUST BE FIRST)
-app.use((req, res, next) => {
-    logger.info(`${req.method} ${req.url} - Origin: ${req.headers.origin}`);
-    next();
-});
-
-// CORS (MUST BE BEFORE OTHER MIDDLEWARE)
+// CORS (Allow dynamic origin with credentials)
 app.use(cors({
-    origin: (origin, callback) => {
-        // Allow all origins that have withCredentials: true
-        // This mirrors the origin back to the client
-        callback(null, true);
-    },
+    origin: true,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
     exposedHeaders: ['Content-Length', 'Authorization'],
-    optionsSuccessStatus: 200
+    optionsSuccessStatus: 200,
+    maxAge: 86400 // Cache preflight response for 24 hours
 }));
 
 // Security Middleware
@@ -39,6 +28,11 @@ app.use(helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 app.use(cookieParser());
+
+// Health Check
+app.get("/health", (req, res) => {
+    res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+});
 
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
@@ -50,12 +44,16 @@ app.use("/api/", limiter);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-async function main() {
-    await mongoose.connect(process.env.MONGO_URL);
+// Database Connection (Moved to bottom of middleware setup to avoid blocking)
+const connectDB = async () => {
+    try {
+        await mongoose.connect(process.env.MONGO_URL);
+        logger.info("Database Is connected...");
+    } catch (err) {
+        logger.error("Database connection error:", err);
+    }
 };
-
-main().then(() => logger.info("Database Is connected...")).catch((err) => logger.error(err));
-
+connectDB();
 
 app.use("/api/interview", interviewRoutes);
 app.use("/api/auth", userAuth);

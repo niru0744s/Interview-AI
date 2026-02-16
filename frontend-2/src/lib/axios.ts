@@ -3,6 +3,11 @@ import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig, AxiosResp
 const api: AxiosInstance = axios.create({
     baseURL: `${import.meta.env.VITE_BACKEND_URL}/api` as string,
     withCredentials: true,
+    headers: {
+        "Content-Type": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+        "Accept": "application/json, text/plain, */*",
+    },
 });
 
 api.interceptors.request.use(
