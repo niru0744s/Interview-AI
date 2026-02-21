@@ -8,25 +8,96 @@ const client = new OpenAI({
 });
 
 /**
+ * Parse raw resume text into structured JSON
+ */
+exports.structureResume = async (rawText) => {
+  const systemPrompt = `
+You are an expert resume parser. Extract the user data from the following raw resume text.
+Clean the text by removing extra spaces, repeated headers, page numbers, and normalizing bullet points.
+
+Return ONLY valid JSON in this exact format. If a field is missing, return an empty array/string:
+{
+  "name": "",
+  "skills": [],
+  "projects": [
+    {
+      "name": "",
+      "techStack": [],
+      "description": ""
+    }
+  ],
+  "experience": [
+    {
+      "company": "",
+      "role": "",
+      "duration": "",
+      "technologies": []
+    }
+  ],
+  "education": []
+}
+`;
+
+  const userPrompt = `Raw Resume Text:\n${rawText}`;
+
+  try {
+    const response = await client.chat.completions.create({
+      model: "openai/gpt-oss-20b",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ],
+      temperature: 0.1,
+      response_format: { type: "json_object" }
+    });
+
+    const content = response.choices[0].message.content;
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("No JSON found");
+
+    return JSON.parse(jsonMatch[0]);
+  } catch (err) {
+    console.error("AI failed to structure resume JSON:", err.message);
+    return null; // Fallback to raw text if AI fails
+  }
+};
+
+/**
  * Generate one interview question
  */
-exports.generateQuestion = async ({ role, topic, difficulty, askedQuestions, resumeContent }) => {
-  const systemPrompt = `
+exports.generateQuestion = async ({ role, topic, difficulty, askedQuestions, resumeContent, resumeData }) => {
+  let systemPrompt = `
 You are a strict technical interviewer for a ${role} role.
 The specific focus/topic for this part of the interview is: ${topic}.
+`;
 
-${resumeContent ? `
-I have provided the candidate's resume/experience below. 
+  if (resumeData && typeof resumeData === 'object' && Object.keys(resumeData).length > 0) {
+    systemPrompt += `
+The candidate's structured resume data is provided below. 
+You must ask ONE SHORT AND DIRECT technical question based on their actual experience.
+Do this by picking ONE skill and ONE project from the data.
+
+RESUME DATA:
+${JSON.stringify(resumeData, null, 2)}
+`;
+  } else if (resumeContent) {
+    systemPrompt += `
+I have provided the candidate's raw resume/experience below. 
 Use this context to tailor your questions to their actual background, projects, and skills where possible. 
+
 RESUME CONTEXT:
 ${resumeContent}
-` : ""}
+`;
+  }
 
+  systemPrompt += `
 Rules:
-- Ask ONE interview-level technical question strictly related to the topic: ${topic}.
-- No explanations
-- No hints
-- Do not repeat previous questions
+- Ask exactly ONE direct question.
+- Do NOT ask multi-part questions (e.g., avoid "1. ..., 2. ..., 3. ...").
+- Keep your question under 3 sentences.
+- Focus strictly on ${topic}.
+- No explanations or hints.
+- Do not repeat previous questions.
 - Difficulty: ${difficulty}
 `;
 

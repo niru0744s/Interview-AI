@@ -3,13 +3,15 @@ const Interview = require("../models/Interview.js");
 const InterviewAnswer = require("../models/InterviewAnswer.js");
 
 
-exports.startInterview = async ({ userId, role, topic, totalQuestions, resumeContent, templateId, difficulty }) => {
+exports.startInterview = async ({ userId, role, topic, totalQuestions, resumeContent, resumeUrl, resumeData, templateId, difficulty }) => {
   return await Interview.create({
     userId,
     role,
     topic: topic || "General",
     totalQuestions: totalQuestions || 10,
     resumeContent: resumeContent || null,
+    resumeUrl: resumeUrl || null,
+    resumeData: resumeData || null,
     templateId: templateId || null,
     difficulty: difficulty || "intermediate"
   });
@@ -59,7 +61,8 @@ exports.nextQuestion = async (interviewId) => {
     topic: interview.topic,
     difficulty,
     askedQuestions: asked.map(q => q.question),
-    resumeContent: interview.resumeContent
+    resumeContent: interview.resumeContent,
+    resumeData: interview.resumeData
   });
 
   const questionData = {

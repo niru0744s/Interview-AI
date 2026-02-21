@@ -35,6 +35,12 @@ export default function Interviews() {
         formData.append("resumeText", payload.resumeText);
       }
 
+      if (payload.resumeFile) {
+        toast.info("AI is reading and parsing your resume... This may take a few seconds.");
+      } else {
+        toast.info("AI is preparing your interview environment...");
+      }
+
       const interviewId = await startInterview(formData);
       toast.success("AI is ready! Launching your session...");
       navigate(`/interview/${interviewId}`);

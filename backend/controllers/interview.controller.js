@@ -5,8 +5,11 @@ const InterviewSummary = require("../models/InterviewSummary.js");
 const { generateAISummary } = require("../services/aiSummary.service.js");
 
 const multer = require("multer");
-const pdf = require("pdf-parse");
+const { PDFParse } = require("pdf-parse");
 const upload = multer({ storage: multer.memoryStorage() });
+
+const { uploadBufferToCloudinary } = require("../utils/cloudinary");
+const { structureResume } = require("../services/ai.service");
 
 exports.startInterviewController = [
   upload.single("resumeFile"),
@@ -14,8 +17,26 @@ exports.startInterviewController = [
     try {
       const { role, topic, totalQuestions, resumeText, templateId, difficulty } = req.body;
       let finalResumeContent = resumeText || null;
+      let resumeUrl = null;
+      let resumeData = null;
 
-      // ... (middle code handled by contiguous edit)
+      if (req.file) {
+        try {
+          const parser = new PDFParse({ data: req.file.buffer });
+          const data = await parser.getText();
+          finalResumeContent = data.text;
+
+          const cloudRes = await uploadBufferToCloudinary(req.file.buffer);
+          resumeUrl = cloudRes.secure_url;
+        } catch (err) {
+          console.error("PDF Parse or Cloudinary Upload Error:", err);
+          // Proceed without resume data if upload fails to not block user
+        }
+      }
+
+      if (finalResumeContent) {
+        resumeData = await structureResume(finalResumeContent);
+      }
 
       const userId = req.user._id;
       const interview = await startInterview({
@@ -24,6 +45,8 @@ exports.startInterviewController = [
         topic: topic || "General",
         totalQuestions: totalQuestions ? parseInt(totalQuestions) : 10,
         resumeContent: finalResumeContent,
+        resumeUrl,
+        resumeData,
         templateId: templateId || null,
         difficulty: difficulty || "intermediate"
       });

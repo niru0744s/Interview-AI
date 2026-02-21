@@ -64,6 +64,14 @@ const newSchema = mongoose.Schema({
     resumeContent: {
         type: String,
         default: null
+    },
+    resumeUrl: {
+        type: String,
+        default: null
+    },
+    resumeData: {
+        type: Object,
+        default: null
     }
 }, {
     timestamps: true,
