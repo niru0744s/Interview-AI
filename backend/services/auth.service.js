@@ -27,10 +27,10 @@ exports.registerUser = async ({ email, password }) => {
 
 exports.loginUser = async ({ email, password }) => {
   const user = await User.findOne({ email });
-  if (!user) throw new Error("Invalid credentials");
+  if (!user) throw new Error("User Not Found!");
 
   const valid = await bcrypt.compare(password, user.password);
-  if (!valid) throw new Error("Invalid credentials");
+  if (!valid) throw new Error("Wrong Password!");
 
   if (!user.isVerified) {
     throw new Error("Email not verified");

@@ -4,7 +4,7 @@ const AICache = require("../models/AICache");
 
 const client = new OpenAI({
   apiKey: process.env.AI_API_KEY,
-  baseURL: 'https://api.perplexity.ai'
+  baseURL: 'https://api.groq.com/openai/v1'
 });
 
 /**
@@ -38,13 +38,12 @@ Ask the next question.
 `;
 
   const response = await client.chat.completions.create({
-    model: "sonar",
+    model: "openai/gpt-oss-20b",
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt }
     ],
-    temperature: 0.4,
-    // disable_search: true // Optional: check if sonar-small/large etc needs this
+    temperature: 0.4
   });
 
   return {
@@ -95,13 +94,13 @@ Candidate Answer: ${answer}
 `;
 
   const response = await client.chat.completions.create({
-    model: "sonar",
+    model: "openai/gpt-oss-20b",
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt }
     ],
     temperature: 0.2,
-    // response_format: { type: "json_object" } // Sonic model support?
+    response_format: { type: "json_object" }
   });
 
   let content = response.choices[0].message.content;
@@ -129,6 +128,13 @@ Candidate Answer: ${answer}
 
   try {
     const parsed = JSON.parse(content);
+
+    // Add fallback for missing fields when using smaller open-source models
+    if (parsed.ideal_answer === undefined) parsed.ideal_answer = "No ideal answer provided by the AI.";
+    if (!Array.isArray(parsed.strengths)) parsed.strengths = [];
+    if (!Array.isArray(parsed.missing_points)) parsed.missing_points = [];
+    if (typeof parsed.score !== "number") parsed.score = Number(parsed.score) || 0;
+
     assertEvaluationShape(parsed);
 
     // Set Cache
@@ -175,12 +181,13 @@ Generate the detailed technical summary.
 `;
 
   const response = await client.chat.completions.create({
-    model: "sonar",
+    model: "openai/gpt-oss-20b",
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt }
     ],
-    temperature: 0.3
+    temperature: 0.3,
+    response_format: { type: "json_object" }
   });
 
   let content = response.choices[0].message.content;

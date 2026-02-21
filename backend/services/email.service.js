@@ -2,7 +2,7 @@ const { Resend } = require("resend");
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-const SENDER_EMAIL = "onboarding@resend.dev"; // Use verified domain or Resend's default test sender
+const SENDER_EMAIL = "noreply@interview-ai.fun";
 
 exports.sendVerificationEmail = async (to, token) => {
     const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
