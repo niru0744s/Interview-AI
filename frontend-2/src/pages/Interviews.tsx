@@ -9,7 +9,10 @@ import InterviewConfigDialog from "../components/interviews/InterviewConfigDialo
 import InterviewHistoryList from "../components/interviews/InterviewHistoryList";
 import { toast } from "sonner";
 
+import { useAuth } from "../context/AuthContext";
+
 export default function Interviews() {
+  const { user } = useAuth();
   const { interviews, loading, creating, startInterview } = useInterviews();
   const [isSettingUp, setIsSettingUp] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<"history" | "insights">("history");
@@ -23,6 +26,21 @@ export default function Interviews() {
     resumeFile: File | null;
     resumeText: string;
   }) => {
+    // Credit check
+    const requiredCredits = payload.totalQuestions * 10;
+    const isUltimate = user?.plan === 'ultimate';
+    const userCredits = typeof user?.credits === 'number' ? user.credits : parseInt(user?.credits as string || '0');
+
+    if (!isUltimate && userCredits < requiredCredits) {
+      toast.error(`Insufficient Credits! You need ${requiredCredits} credits.`, {
+        action: {
+          label: 'Upgrade Plan',
+          onClick: () => navigate('/pricing')
+        }
+      });
+      return;
+    }
+
     try {
       const formData = new FormData();
       formData.append("role", payload.role);

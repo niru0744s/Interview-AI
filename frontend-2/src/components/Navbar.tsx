@@ -63,6 +63,16 @@ export default function Navbar() {
                                     <p className="text-[8px] font-bold leading-none text-muted-foreground">Switch</p>
                                 </button>
 
+                                {/* Upgrades & Credits  */}
+                                {user.role === 'candidate' && (
+                                    <Link to="/pricing" className="hidden sm:flex flex-col text-right hover:opacity-70 transition-opacity ml-2 border-l border-white/10 pl-3">
+                                        <p className="text-[10px] font-black leading-none uppercase tracking-tighter text-yellow-400 mb-0.5">
+                                            {user.plan === 'ultimate' ? 'Ultimate' : `${user.credits} CR`}
+                                        </p>
+                                        <p className="text-[8px] font-bold leading-none text-muted-foreground">Upgrade</p>
+                                    </Link>
+                                )}
+
                                 <Button
                                     size="icon"
                                     variant="ghost"

@@ -16,7 +16,6 @@ exports.register = async (req, res) => {
 
     const { user } = await registerUser({ email, password });
 
-    // Do NOT set cookie or auto-login
     res.json({
       message: "Registration successful. Please check your email to verify your account.",
       user: { email: user.email }

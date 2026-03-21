@@ -38,6 +38,16 @@ exports.startInterviewController = [
         resumeData = await structureResume(finalResumeContent);
       }
 
+      const isCustomOrResume = !templateId;
+      const tQues = totalQuestions ? parseInt(totalQuestions) : 10;
+      const requiredCredits = tQues * 10;
+
+      if (isCustomOrResume) {
+        if (req.user.plan !== "ultimate" && req.user.credits < requiredCredits) {
+          return res.status(403).json({ error: `Not enough credits. You need ${requiredCredits} credits for a ${tQues}-question interview.` });
+        }
+      }
+
       const userId = req.user._id;
       const interview = await startInterview({
         userId,
@@ -50,6 +60,12 @@ exports.startInterviewController = [
         templateId: templateId || null,
         difficulty: difficulty || "intermediate"
       });
+
+      if (isCustomOrResume && req.user.plan !== "ultimate") {
+        req.user.credits -= requiredCredits;
+        await req.user.save();
+      }
+
       res.json({ interviewId: interview._id });
     } catch (err) {
       res.status(500).json({ error: err.message });

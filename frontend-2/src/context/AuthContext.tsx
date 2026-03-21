@@ -4,6 +4,9 @@ import api from "../lib/axios";
 export type User = {
     role: "candidate" | "recruiter";
     email?: string;
+    name?: string;
+    plan?: string;
+    credits?: number | string;
 };
 
 type AuthContextType = {
@@ -12,6 +15,7 @@ type AuthContextType = {
     login: (user: User) => void;
     logout: () => void;
     switchRole: () => Promise<"candidate" | "recruiter">;
+    setUserContext: (user: User | null) => void;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -65,8 +69,12 @@ export const AuthProvider = ({ children }: AuthContextProps) => {
         }
     };
 
+    const setUserContext = (userData: User | null) => {
+        setUser(userData);
+    }
+
     return (
-        <AuthContext.Provider value={{ user, loading, login, logout, switchRole }}>
+        <AuthContext.Provider value={{ user, loading, login, logout, switchRole, setUserContext }}>
             {children}
         </AuthContext.Provider>
     )

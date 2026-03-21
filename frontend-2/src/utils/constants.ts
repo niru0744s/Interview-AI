@@ -7,6 +7,7 @@ export const PREDEFINED_ROLES = [
     "Software Architect",
     "Data Scientist",
     "QA Automation",
+    "Data Analyst",
     "Other"
 ];
 
@@ -19,5 +20,6 @@ export const TOPICS_MAPPING: Record<string, string[]> = {
     "Software Architect": ["Design Patterns", "Scalability", "Domain Driven Design", "Cloud Architecture"],
     "Data Scientist": ["Python", "Machine Learning", "Data Engineering", "Statistics", "SQL"],
     "QA Automation": ["Selenium", "Jest/Cypress", "Load Testing", "E2E Testing", "Unit Testing"],
+    "Data Analyst":["PowerBI"],
     "Other": ["General Knowledge", "Problem Solving", "Soft Skills", "Custom"]
 };

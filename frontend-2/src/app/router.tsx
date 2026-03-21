@@ -15,6 +15,7 @@ import VerifyEmail from "../pages/VerifyEmail";
 import ForgotPassword from "../pages/ForgotPassword";
 import ResetPassword from "../pages/ResetPassword";
 import Settings from "../pages/Settings";
+import Pricing from "../pages/Pricing";
 
 import Layout from "../components/Layout";
 
@@ -63,6 +64,11 @@ export const router = createBrowserRouter([
     {
         path: "/settings",
         element: <Layout><Settings /></Layout>,
+        errorElement: <RouteError />
+    },
+    {
+        path: "/pricing",
+        element: <Layout><Pricing /></Layout>,
         errorElement: <RouteError />
     },
 

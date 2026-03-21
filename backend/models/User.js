@@ -14,6 +14,19 @@ const newSchema = mongoose.Schema({
         enum: ["candidate", "recruiter"],
         default: "candidate"
     },
+    plan: {
+        type: String,
+        enum: ["free", "standard", "advance", "ultimate"],
+        default: "free"
+    },
+    credits: {
+        type: Number,
+        default: 500
+    },
+    planExpiresAt: {
+        type: Date,
+        default: null
+    },
     isVerified: {
         type: Boolean,
         default: false

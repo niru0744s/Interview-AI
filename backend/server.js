@@ -3,6 +3,7 @@ const app = require("./app");
 const http = require("http");
 const { Server } = require("socket.io");
 const { initSocket } = require("./config/socket");
+require("./cron/creditRefresh"); // Initialize cron jobs
 
 const server = http.createServer(app);
 

@@ -11,8 +11,8 @@ const logger = require("./utils/logger");
 const interviewRoutes = require("./routes/interview.routes");
 const userAuth = require("./routes/auth.routes");
 const templateRoutes = require("./routes/template.routes");
+const paymentRoutes = require("./routes/payment.routes");
 
-// CORS (Allow dynamic origin with credentials)
 app.use(cors({
     origin: true,
     credentials: true,
@@ -20,10 +20,9 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
     exposedHeaders: ['Content-Length', 'Authorization'],
     optionsSuccessStatus: 200,
-    maxAge: 86400 // Cache preflight response for 24 hours
+    maxAge: 86400
 }));
 
-// Security Middleware
 app.use(helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
@@ -35,8 +34,8 @@ app.get("/health", (req, res) => {
 });
 
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // Limit each IP to 100 requests per window
+    windowMs: 15 * 60 * 1000,
+    max: 100,
     message: "Too many requests from this IP, please try again after 15 minutes"
 });
 app.use("/api/", limiter);
@@ -58,6 +57,7 @@ connectDB();
 app.use("/api/interview", interviewRoutes);
 app.use("/api/auth", userAuth);
 app.use("/api/templates", templateRoutes);
+app.use("/api/payment", paymentRoutes);
 
 // Centralized Error Handling
 app.use((err, req, res, next) => {
