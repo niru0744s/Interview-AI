@@ -34,13 +34,16 @@ export default function Login() {
       toast.success("Welcome back! Loading your dashboard...");
       navigate(res.data.user.role === "recruiter" ? "/recruiter" : "/interviews");
     } catch (err: unknown) {
-      const axiosError = err as { response?: { data?: { message?: string } } };
+      const axiosError = err as { response?: { data?: { message?: string, error?: string } }, message?: string, request?: any };
       let message = "An unexpected error occurred. Please try again.";
 
       if (axiosError.response) {
-        // Server responded with an error
-        message = axiosError.response.data?.message || "Invalid credentials. Please verify your email and password.";
-      } else if ((err as any).request) {
+        // Server responded with an error but interceptor didn't catch it
+        message = axiosError.response.data?.error || axiosError.response.data?.message || "Invalid credentials. Please verify your email and password.";
+      } else if (axiosError.message && axiosError.message !== "Request failed with status code 401" && axiosError.message !== "Request failed with status code 400" && axiosError.message !== "Request failed with status code 404") {
+        // Intercepted error from axios.ts
+        message = axiosError.message;
+      } else if (axiosError.request) {
         // Request was made but no response received (Network error/CORS)
         message = "Unable to connect to server. Please check your internet connection or try again later.";
       }

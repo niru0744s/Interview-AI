@@ -36,7 +36,6 @@ export default function Interview() {
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [skipping, setSkipping] = useState<boolean>(false);
   const [cooldown, setCooldown] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
   const [optimisticAnswer, setOptimisticAnswer] = useState<string | null>(null);
 
   const { status, socket, error: socketError } = useSocketStateMachine(
@@ -92,10 +91,12 @@ export default function Interview() {
     });
 
     socket.on("error", (msg: string) => {
-      setError(msg);
+      toast.error(msg);
       setSubmitting(false);
       setLoading(false);
       setOptimisticAnswer(null);
+      // If we previously cleared the answer due to optimism, we should ideally restore it.
+      // We rely on the ack callback to restore the answer if it was a submission error.
     });
 
     if (!question && !optimisticAnswer) {
@@ -128,7 +129,7 @@ export default function Interview() {
       (ack: { status: string; message?: string }) => {
         setSubmitting(false);
         if (ack.status === "error") {
-          setError(ack.message || "Failed to submit answer");
+          toast.error(ack.message || "Failed to submit answer");
           setAnswer(submittedAnswer);
           setOptimisticAnswer(null);
           setLoading(false); // Unlock if error
@@ -159,11 +160,11 @@ export default function Interview() {
     }
   };
 
-  if (socketError || error) {
+  if (socketError) {
     return (
       <div className="p-6 text-red-500 text-center">
         <h3 className="text-lg font-bold">Error</h3>
-        <p>{socketError || error}</p>
+        <p>{socketError}</p>
         <Button className="mt-4" onClick={() => window.location.reload()}>
           Retry Connection
         </Button>

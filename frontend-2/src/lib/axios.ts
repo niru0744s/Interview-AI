@@ -25,6 +25,7 @@ api.interceptors.response.use(
         return Promise.reject({
             status,
             message:
+                (error.response?.data as { error?: string })?.error ||
                 (error.response?.data as { message?: string })?.message ||
                 error.message ||
                 "Something went wrong",

@@ -4,6 +4,7 @@ import { Check, Star, Zap, Crown, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { createOrder, verifyPayment, cancelPlan } from '../services/payment.service';
 import { useAuth } from '../context/AuthContext';
+import { motion } from 'framer-motion';
 
 // Use window.Razorpay properly
 declare global {
@@ -189,109 +190,128 @@ const Pricing = () => {
     ];
 
     return (
-        <div className="min-h-screen bg-black text-white py-20 px-4 relative overflow-hidden">
+        <div className="min-h-[calc(100vh-4rem)] bg-[#050505] text-white py-20 px-4 relative overflow-hidden font-sans">
             {/* Background Effects */}
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-full pointer-events-none">
-                <div className="absolute top-20 left-10 w-72 h-72 bg-purple-600/20 rounded-full blur-[120px]"></div>
-                <div className="absolute bottom-20 right-10 w-96 h-96 bg-blue-600/20 rounded-full blur-[150px]"></div>
+                <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[500px] w-full max-w-2xl mx-auto rounded-full bg-cyan-500/10 blur-[120px]"></div>
             </div>
 
-            <div className="max-w-7xl mx-auto relative z-10 font-sans">
+            <div className="max-w-7xl mx-auto relative z-10">
 
                 {/* Header Section */}
                 <div className="text-center mb-16 space-y-4">
-                    <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-gray-200 to-gray-400">
+                    <h1 className="text-4xl md:text-5xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400">
                         Supercharge Your Interview Prep
                     </h1>
-                    <p className="text-lg text-gray-400 max-w-2xl mx-auto">
+                    <p className="text-lg text-slate-400 max-w-2xl mx-auto font-medium leading-relaxed">
                         Top up your credits to unlock AI-driven mock interviews, deep insights, and land your dream job faster. These credits will stay active for a month.
                     </p>
                 </div>
 
                 {/* Pricing Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center max-w-6xl mx-auto">
-                    {plans.map((plan) => (
-                        <div
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch max-w-6xl mx-auto px-4">
+                    {plans.map((plan, index) => (
+                        <motion.div
                             key={plan.id}
-                            className={`relative group rounded-3xl backdrop-blur-xl border bg-white/5 p-8 transition-all duration-300 hover:-translate-y-2
-                ${plan.borderColor} ${plan.popular ? 'md:-mt-8 md:mb-8 scale-105 shadow-2xl shadow-purple-500/20' : ''}`}
+                            initial={{ opacity: 0, y: 40 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.5, delay: (index + 1) * 0.1, type: "spring", stiffness: 100 }}
+                            whileHover={{ scale: 1.02 }}
+                            className={`relative flex flex-col group rounded-[2.5rem] backdrop-blur-3xl border bg-white/[0.02] p-8 transition-colors duration-300
+                            border-t border-l border-white/10 border-b border-r border-white/5
+                            ${plan.popular ? 'md:-mt-8 md:mb-8 border-cyan-500/30 shadow-[0_0_40px_rgba(34,211,238,0.15)] hover:shadow-[0_0_60px_rgba(34,211,238,0.25)]' : 'hover:bg-white/[0.04]'}`}
                         >
-
                             {/* Popular Badge */}
                             {plan.popular && (
-                                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-lg">
+                                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-slate-200 text-black text-[10px] font-black uppercase tracking-[0.2em] px-5 py-1.5 rounded-full shadow-[0_0_15px_rgba(226,232,240,0.5)] z-20">
                                     MOST POPULAR
                                 </div>
                             )}
 
-                            {/* Background gradient on hover */}
-                            <div className={`absolute inset-0 rounded-3xl bg-gradient-to-br ${plan.color} opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10`}></div>
+                            {/* Hover Glow Behind Card */}
+                            {plan.popular && (
+                                <div className="absolute inset-0 rounded-[2.5rem] bg-cyan-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10 blur-xl"></div>
+                            )}
 
-                            <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center justify-between mb-8">
                                 <div>
-                                    <h3 className="text-2xl font-bold text-white">{plan.name}</h3>
+                                    <h3 className="text-2xl font-bold text-white tracking-tight">{plan.name}</h3>
                                     <div className="mt-2 flex items-baseline">
-                                        <span className="text-4xl font-extrabold text-white">{plan.price}</span>
-                                        <span className="text-gray-400 ml-1">{plan.period}</span>
+                                        <span className="text-5xl font-black text-white font-mono">{plan.price}</span>
+                                        <span className="text-slate-400 ml-2 font-medium">{plan.period}</span>
                                     </div>
                                 </div>
-                                <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-md">
+                                <div className={`p-4 rounded-2xl backdrop-blur-md border border-white/5 ${plan.popular ? 'bg-cyan-500/10 [&>svg]:text-cyan-400' : 'bg-white/5 [&>svg]:text-slate-300'}`}>
                                     {plan.icon}
                                 </div>
                             </div>
 
-                            <div className="mb-8 p-4 bg-black/40 rounded-xl border border-white/5">
-                                <p className="text-sm text-gray-300 font-medium text-center">
-                                    <span className="text-white font-bold">{plan.credits}</span> Credits Included
+                            <div className="mb-8 p-4 bg-black/60 rounded-2xl border border-white/5">
+                                <p className="text-sm text-slate-300 font-medium text-center">
+                                    <span className="text-white font-bold font-mono">{plan.credits}</span> Credits Included
                                 </p>
                             </div>
 
-                            <ul className="space-y-4 mb-8">
+                            <ul className="space-y-4 mb-12 flex-grow">
                                 {plan.features.map((feature, idx) => (
-                                    <li key={idx} className="flex items-start text-gray-300">
-                                        <Check className="w-5 h-5 text-green-400 mr-3 shrink-0" />
-                                        <span className="text-sm leading-tight">{feature}</span>
+                                    <li key={idx} className="flex items-start text-slate-300 font-medium">
+                                        <Check className="w-5 h-5 text-cyan-400 drop-shadow-[0_0_5px_rgba(34,211,238,0.5)] mr-4 shrink-0" />
+                                        <span className="text-sm leading-relaxed">{feature}</span>
                                     </li>
                                 ))}
                             </ul>
 
-                            <div className="w-full">
+                            <div className="w-full mt-auto">
                                 {user?.plan === plan.id ? (
                                     <div className="space-y-3 w-full animate-fade-in">
-                                        <button disabled className="w-full py-4 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center bg-green-500/20 text-green-400 border border-green-500/30">
-                                            <Check className="w-5 h-5 mr-2" /> Active Plan
+                                        <button disabled className="w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg flex items-center justify-center bg-emerald-500/10 text-emerald-400 border border-emerald-500 drop-shadow-[0_0_10px_rgba(16,185,129,0.2)]">
+                                            <Check className="w-5 h-5 mr-2" /> Locked-In
                                         </button>
                                         <button
                                             onClick={handleCancelPlan}
                                             disabled={cancelling}
-                                            className="w-full py-2.5 rounded-xl font-bold text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 transition-all text-sm flex items-center justify-center"
+                                            className="w-full py-2.5 rounded-xl font-bold text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 transition-all text-xs flex items-center justify-center uppercase tracking-wider"
                                         >
-                                            {cancelling ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : 'Cancel Subscription'}
+                                            {cancelling ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : 'Cancel Plan'}
                                         </button>
                                     </div>
                                 ) : (
-                                    <button
-                                        onClick={() => handleUpgrade(plan.id, plan.credits)}
-                                        disabled={loadingPlan === plan.id || Boolean(user?.plan && user.plan !== 'free')}
-                                        className={`w-full py-4 rounded-xl font-bold text-white transition-all duration-300 shadow-lg flex items-center justify-center
-                                            ${plan.buttonBg} disabled:opacity-50 disabled:cursor-not-allowed
-                                            ${plan.popular ? 'shadow-purple-500/30 hover:shadow-purple-500/50' : ''}`}
-                                    >
-                                        {loadingPlan === plan.id ? (
-                                            <Loader2 className="w-5 h-5 animate-spin" />
-                                        ) : (
-                                            plan.buttonText
+                                    <div className="relative overflow-hidden rounded-2xl group/btn cursor-pointer">
+                                        <button
+                                            onClick={() => handleUpgrade(plan.id, plan.credits)}
+                                            disabled={loadingPlan === plan.id || Boolean(user?.plan && user.plan !== 'free')}
+                                            className={`w-full relative py-4 rounded-2xl font-black uppercase tracking-widest transition-all duration-300 flex items-center justify-center
+                                                disabled:opacity-50 disabled:cursor-not-allowed
+                                                ${plan.popular 
+                                                    ? 'bg-gradient-to-br from-cyan-400 to-cyan-600 text-black hover:brightness-110 shadow-[0_0_15px_rgba(34,211,238,0.2)] border-none' 
+                                                    : 'border border-white/10 bg-white/5 hover:bg-white/10 text-slate-200'}`}
+                                        >
+                                            {loadingPlan === plan.id ? (
+                                                <Loader2 className="w-5 h-5 animate-spin" />
+                                            ) : (
+                                                plan.buttonText
+                                            )}
+                                        </button>
+                                        {plan.popular && !Boolean(user?.plan && user.plan !== 'free') && (
+                                            <motion.div 
+                                                initial={{ x: "-100%" }}
+                                                animate={{ x: "200%" }}
+                                                transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 3, ease: "easeInOut" }}
+                                                className="absolute inset-0 w-[150%] h-full bg-gradient-to-r from-transparent via-white/40 to-transparent skew-x-[-20deg] pointer-events-none z-10"
+                                            />
                                         )}
-                                    </button>
+                                    </div>
                                 )}
                             </div>
-                        </div>
+                        </motion.div>
                     ))}
                 </div>
 
-                {/* FAQ or Trust Badge Section (Optional) */}
-                <div className="mt-20 text-center">
-                    <p className="text-sm text-gray-500">Secure payments powered by <span className="text-gray-300 font-semibold">Razorpay</span></p>
+                {/* Trust Badge Section */}
+                <div className="mt-24 text-center">
+                    <p className="text-[10px] text-slate-600 uppercase tracking-widest font-bold">
+                        Secure payments powered by <span className="text-cyan-600/50">Razorpay</span>
+                    </p>
                 </div>
 
             </div>

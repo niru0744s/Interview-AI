@@ -164,15 +164,21 @@ Question: ${question}
 Candidate Answer: ${answer}
 `;
 
-  const response = await client.chat.completions.create({
-    model: "openai/gpt-oss-20b",
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt }
-    ],
-    temperature: 0.2,
-    response_format: { type: "json_object" }
-  });
+  let response;
+  try {
+    response = await client.chat.completions.create({
+      model: "openai/gpt-oss-20b",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ],
+      temperature: 0.2,
+      response_format: { type: "json_object" }
+    });
+  } catch (apiErr) {
+    console.error("AI API Call Failed:", apiErr.message || apiErr);
+    throw new Error(`AI Provider Error: ${apiErr.message || "Unknown error"}. Please check API limits or status.`);
+  }
 
   let content = response.choices[0].message.content;
 

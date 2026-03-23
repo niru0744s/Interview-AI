@@ -22,6 +22,9 @@ exports.register = async (req, res) => {
     });
   } catch (err) {
     console.error("Registration error:", err);
+    if (err.message === "User already exists") {
+      return res.status(409).json({ error: err.message });
+    }
     res.status(400).json({ error: err.message });
   }
 }
@@ -33,6 +36,12 @@ exports.login = async (req, res) => {
     res.cookie("token", token, cookieOptions);
     res.json({ user: { email: user.email, role: user.role, isVerified: user.isVerified } });
   } catch (err) {
+    if (err.message === "User Not Found!") {
+      return res.status(404).json({ error: err.message });
+    }
+    if (err.message === "Wrong Password!") {
+      return res.status(401).json({ error: err.message });
+    }
     if (err.message === "Email not verified") {
       return res.status(403).json({ error: "Email not verified. Please check your inbox." });
     }
@@ -64,6 +73,12 @@ exports.resendVerification = async (req, res) => {
     await resendVerification(email);
     res.json({ message: "Verification email sent" });
   } catch (err) {
+    if (err.message === "User not found") {
+      return res.status(404).json({ error: err.message });
+    }
+    if (err.message === "User already verified") {
+      return res.status(400).json({ error: err.message });
+    }
     res.status(400).json({ error: err.message });
   }
 };
@@ -77,6 +92,10 @@ exports.forgotPassword = async (req, res) => {
 
     res.json({ message: "If an account exists with this email, a password reset link has been sent." });
   } catch (err) {
+    if (err.message === "User not found") {
+      // Don't leak user existence; return success
+      return res.json({ message: "If an account exists with this email, a password reset link has been sent." });
+    }
     console.error("Forgot password error:", err);
     res.status(400).json({ error: "Could not send reset email" });
   }
@@ -91,6 +110,9 @@ exports.resetPassword = async (req, res) => {
 
     res.json({ message: "Password reset successfully. You can now login." });
   } catch (err) {
+    if (err.message === "Token is invalid or has expired") {
+      return res.status(400).json({ error: err.message });
+    }
     res.status(400).json({ error: err.message });
   }
 };
@@ -121,7 +143,8 @@ exports.deleteAccount = async (req, res) => {
     const User = require("../models/User");
 
     // The pre('findOneAndDelete') hook in User model will handle cascading deletes
-    await User.findByIdAndDelete(userId);
+    const deletedUser = await User.findByIdAndDelete(userId);
+    console.log("Deleted user:", deletedUser);
 
     res.clearCookie("token");
     res.json({ message: "Account and all associated data deleted successfully." });

@@ -1,0 +1,18 @@
+Error: AI Provider Error: 400 Failed to validate JSON. Please adjust your prompt. See 'failed_generation' for more details.. Please check API limits or status.
+Error: AI Provider Error: 400 Failed to validate JSON. Please adjust your prompt. See 'failed_generation' for more details.. Please check API limits or status.
+    at exports.evaluateAnswer (D:\My_Passion\Production_app\Interview-AI\backend\services\ai.service.js:180:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async exports.submitAnswer (D:\My_Passion\Production_app\Interview-AI\backend\services\interview.service.js:105:18)
+    at async Socket.<anonymous> (D:\My_Passion\Production_app\Interview-AI\backend\config\socket.js:61:36)
+Error: AI Provider Error: 400 Failed to validate JSON. Please adjust your prompt. See 'failed_generation' for more details.. Please check API limits or status.
+Error: AI Provider Error: 400 Failed to validate JSON. Please adjust your prompt. See 'failed_generation' for more details.. Please check API limits or status.
+    at exports.evaluateAnswer (D:\My_Passion\Production_app\Interview-AI\backend\services\ai.service.js:180:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async exports.submitAnswer (D:\My_Passion\Production_app\Interview-AI\backend\services\interview.service.js:105:18)
+    at async Socket.<anonymous> (D:\My_Passion\Production_app\Interview-AI\backend\config\socket.js:61:36)
+Error: AI Provider Error: 400 Failed to validate JSON. Please adjust your prompt. See 'failed_generation' for more details.. Please check API limits or status.
+Error: AI Provider Error: 400 Failed to validate JSON. Please adjust your prompt. See 'failed_generation' for more details.. Please check API limits or status.
+    at exports.evaluateAnswer (D:\My_Passion\Production_app\Interview-AI\backend\services\ai.service.js:180:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async exports.submitAnswer (D:\My_Passion\Production_app\Interview-AI\backend\services\interview.service.js:105:18)
+    at async Socket.<anonymous> (D:\My_Passion\Production_app\Interview-AI\backend\config\socket.js:61:36)

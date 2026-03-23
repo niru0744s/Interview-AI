@@ -108,6 +108,8 @@ exports.submitAnswer = async (interviewId, answer) => {
       answer
     });
   } catch (err) {
+    console.error("DEBUG EVALUATION ERROR:", err);
+    require('fs').appendFileSync('eval_error.log', err.toString() + "\n" + (err.stack || '') + "\n");
     throw new Error("Evaluation failed. Please retry.");
   }
 
