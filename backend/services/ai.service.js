@@ -1,11 +1,24 @@
 const { OpenAI } = require("openai");
 const crypto = require("crypto");
 const AICache = require("../models/AICache");
+const logger = require("../utils/logger");
 
-const client = new OpenAI({
-  apiKey: process.env.AI_API_KEY,
-  baseURL: 'https://api.groq.com/openai/v1'
-});
+let aiClient = null;
+
+const getAIClient = () => {
+  if (!process.env.AI_API_KEY) {
+    throw new Error("Missing AI provider configuration");
+  }
+
+  if (!aiClient) {
+    aiClient = new OpenAI({
+      apiKey: process.env.AI_API_KEY,
+      baseURL: "https://api.groq.com/openai/v1"
+    });
+  }
+
+  return aiClient;
+};
 
 /**
  * Parse raw resume text into structured JSON
@@ -41,6 +54,7 @@ Return ONLY valid JSON in this exact format. If a field is missing, return an em
   const userPrompt = `Raw Resume Text:\n${rawText}`;
 
   try {
+    const client = getAIClient();
     const response = await client.chat.completions.create({
       model: "openai/gpt-oss-20b",
       messages: [
@@ -57,7 +71,7 @@ Return ONLY valid JSON in this exact format. If a field is missing, return an em
 
     return JSON.parse(jsonMatch[0]);
   } catch (err) {
-    console.error("AI failed to structure resume JSON:", err.message);
+    logger.error("AI failed to structure resume JSON", { message: err.message, stack: err.stack });
     return null; // Fallback to raw text if AI fails
   }
 };
@@ -108,6 +122,7 @@ ${askedQuestions.join("\n")}
 Ask the next question.
 `;
 
+  const client = getAIClient();
   const response = await client.chat.completions.create({
     model: "openai/gpt-oss-20b",
     messages: [
@@ -166,6 +181,7 @@ Candidate Answer: ${answer}
 
   let response;
   try {
+    const client = getAIClient();
     response = await client.chat.completions.create({
       model: "openai/gpt-oss-20b",
       messages: [
@@ -176,7 +192,7 @@ Candidate Answer: ${answer}
       response_format: { type: "json_object" }
     });
   } catch (apiErr) {
-    console.error("AI API Call Failed:", apiErr.message || apiErr);
+    logger.error("AI API call failed", { message: apiErr.message || String(apiErr) });
     throw new Error(`AI Provider Error: ${apiErr.message || "Unknown error"}. Please check API limits or status.`);
   }
 
@@ -185,7 +201,7 @@ Candidate Answer: ${answer}
   // Extract JSON using regex to handle potential markdown or preamble text
   const jsonMatch = content.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
-    console.error("No JSON found in AI response:", content);
+    logger.error("No JSON found in AI response", { content });
     throw new Error("AI failed to return evaluation JSON");
   }
   content = jsonMatch[0];
@@ -219,11 +235,11 @@ Candidate Answer: ${answer}
       key: cacheKey,
       value: parsed,
       type: 'evaluation'
-    }).catch(err => console.error("Cache Write Error:", err));
+    }).catch(err => logger.error("Cache write error", { message: err.message, stack: err.stack }));
 
     return parsed;
   } catch (err) {
-    console.error("AI Response logic error:", err, "Content:", content);
+    logger.error("AI response logic error", { message: err.message, stack: err.stack, content });
     throw new Error("AI returned invalid evaluation format");
   }
 };
@@ -257,6 +273,7 @@ ${questionsAndAnswers.map((qa, i) => `Q${i + 1}: ${qa.question}\nA${i + 1}: ${qa
 Generate the detailed technical summary.
 `;
 
+  const client = getAIClient();
   const response = await client.chat.completions.create({
     model: "openai/gpt-oss-20b",
     messages: [

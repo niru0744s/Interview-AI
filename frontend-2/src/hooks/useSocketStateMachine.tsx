@@ -57,11 +57,20 @@ function socketReducer(state: MachineState, action: Action): MachineState {
   }
 }
 
-export function useSocketStateMachine(url: string) {
+export function useSocketStateMachine(url: string, enabled = true) {
   const [state, dispatch] = useReducer(socketReducer, initialState);
   const socketRef = useRef<Socket | null>(null);
 
   const connect = useCallback(() => {
+    if (!enabled || !url) {
+      return;
+    }
+
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+      socketRef.current = null;
+    }
+
     dispatch({ type: "INIT_SOCKET" });
 
     const socket = io(url, {
@@ -99,7 +108,7 @@ export function useSocketStateMachine(url: string) {
     });
 
     socketRef.current = socket;
-  }, [url]);
+  }, [enabled, url]);
 
   const disconnect = useCallback(() => {
     if (socketRef.current) {
@@ -109,9 +118,14 @@ export function useSocketStateMachine(url: string) {
   }, []);
 
   useEffect(() => {
+    if (!enabled || !url) {
+      disconnect();
+      return;
+    }
+
     connect();
     return () => disconnect();
-  }, [connect, disconnect]);
+  }, [connect, disconnect, enabled, url]);
 
   return {
     status: state.status,

@@ -18,4 +18,7 @@ const interviewAnswerSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+interviewAnswerSchema.index({ interviewId: 1, createdAt: 1 });
+interviewAnswerSchema.index({ interviewId: 1, question: 1 }, { unique: true });
+
 module.exports = mongoose.model("InterviewAnswer", interviewAnswerSchema);

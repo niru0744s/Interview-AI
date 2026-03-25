@@ -1,11 +1,12 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User.js");
+const { UnauthorizedError } = require("../utils/errors");
 
 exports.requireAuth = async (req, res, next) => {
   const token = req.cookies?.token || req.headers.authorization?.split(" ")[1];
 
   if (!token) {
-    return res.status(401).json({ error: "Unauthorized" });
+    return next(new UnauthorizedError("Unauthorized"));
   }
 
   try {
@@ -13,12 +14,12 @@ exports.requireAuth = async (req, res, next) => {
     const user = await User.findById(decoded.userId);
 
     if (!user) {
-      return res.status(401).json({ error: "Invalid token" });
+      return next(new UnauthorizedError("Invalid token"));
     }
 
     req.user = user;
     next();
   } catch (err) {
-    res.status(401).json({ error: "Invalid or expired token" });
+    next(new UnauthorizedError("Invalid or expired token"));
   }
-}
+};

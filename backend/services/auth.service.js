@@ -3,12 +3,13 @@ const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const User = require("../models/User.js");
 const { sendVerificationEmail } = require("./email.service");
+const { ConflictError, NotFoundError, UnauthorizedError, ForbiddenError, BadRequestError } = require("../utils/errors");
 
 const JWT_EXPIRES_IN = "7d";
 
 exports.registerUser = async ({ email, password }) => {
   const existing = await User.findOne({ email });
-  if (existing) throw new Error("User already exists");
+  if (existing) throw new ConflictError("User already exists");
 
   const hashedPassword = await bcrypt.hash(password, 12);
   const verificationToken = crypto.randomBytes(32).toString("hex");
@@ -27,13 +28,13 @@ exports.registerUser = async ({ email, password }) => {
 
 exports.loginUser = async ({ email, password }) => {
   const user = await User.findOne({ email });
-  if (!user) throw new Error("User Not Found!");
+  if (!user) throw new NotFoundError("User Not Found!");
 
   const valid = await bcrypt.compare(password, user.password);
-  if (!valid) throw new Error("Wrong Password!");
+  if (!valid) throw new UnauthorizedError("Wrong Password!");
 
   if (!user.isVerified) {
-    throw new Error("Email not verified");
+    throw new ForbiddenError("Email not verified");
   }
 
   const token = jwt.sign(
@@ -46,15 +47,12 @@ exports.loginUser = async ({ email, password }) => {
 }
 
 exports.verifyUserEmail = async (token) => {
-  console.log(`Verifying token: ${token}`);
   const user = await User.findOne({ verificationToken: token });
 
   if (!user) {
-    console.log("No user found with this token.");
-    throw new Error("Invalid or expired verification token");
+    throw new BadRequestError("Invalid or expired verification token");
   }
 
-  console.log(`User found: ${user.email}, verifying...`);
   user.isVerified = true;
   user.verificationToken = undefined;
   await user.save();
@@ -64,8 +62,8 @@ exports.verifyUserEmail = async (token) => {
 
 exports.resendVerification = async (email) => {
   const user = await User.findOne({ email });
-  if (!user) throw new Error("User not found");
-  if (user.isVerified) throw new Error("User already verified");
+  if (!user) throw new NotFoundError("User not found");
+  if (user.isVerified) throw new BadRequestError("User already verified");
 
   const verificationToken = crypto.randomBytes(32).toString("hex");
   user.verificationToken = verificationToken;
@@ -76,7 +74,7 @@ exports.resendVerification = async (email) => {
 
 exports.forgotPassword = async (email) => {
   const user = await User.findOne({ email });
-  if (!user) throw new Error("User not found");
+  if (!user) throw new NotFoundError("User not found");
 
   const resetToken = crypto.randomBytes(32).toString("hex");
   user.resetPasswordToken = crypto.createHash("sha256").update(resetToken).digest("hex");
@@ -95,7 +93,7 @@ exports.resetPassword = async (token, newPassword) => {
     resetPasswordExpires: { $gt: Date.now() }
   });
 
-  if (!user) throw new Error("Token is invalid or has expired");
+  if (!user) throw new BadRequestError("Token is invalid or has expired");
 
   user.password = await bcrypt.hash(newPassword, 12);
   user.resetPasswordToken = undefined;
