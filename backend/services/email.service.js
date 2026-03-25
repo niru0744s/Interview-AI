@@ -1,6 +1,19 @@
 const { Resend } = require("resend");
+const logger = require("../utils/logger");
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let resendClient = null;
+
+const getResendClient = () => {
+    if (!process.env.RESEND_API_KEY) {
+        throw new Error("Missing email provider configuration");
+    }
+
+    if (!resendClient) {
+        resendClient = new Resend(process.env.RESEND_API_KEY);
+    }
+
+    return resendClient;
+};
 
 const SENDER_EMAIL = "noreply@interview-ai.fun";
 
@@ -8,7 +21,8 @@ exports.sendVerificationEmail = async (to, token) => {
     const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
 
     try {
-        console.log(`Attempting to send verification email to: ${to}`);
+        const resend = getResendClient();
+        logger.info("Sending verification email", { to });
 
         const { data, error } = await resend.emails.send({
             from: `Interview AI <${SENDER_EMAIL}>`,
@@ -27,14 +41,14 @@ exports.sendVerificationEmail = async (to, token) => {
         });
 
         if (error) {
-            console.error("Resend API Error:", error);
+            logger.error("Resend API error", { error });
             throw new Error(error.message);
         }
 
-        console.log(`Verification email sent to ${to}. ID: ${data.id}`);
+        logger.info("Verification email sent", { to, id: data.id });
         return data;
     } catch (error) {
-        console.error("Error sending verification email detailed:", error);
+        logger.error("Error sending verification email", { message: error.message, stack: error.stack, to });
         throw new Error("Could not send verification email");
     }
 };
@@ -43,7 +57,8 @@ exports.sendPasswordResetEmail = async (to, token) => {
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
 
     try {
-        console.log(`Attempting to send password reset email to: ${to}`);
+        const resend = getResendClient();
+        logger.info("Sending password reset email", { to });
 
         const { data, error } = await resend.emails.send({
             from: `Interview AI <${SENDER_EMAIL}>`,
@@ -62,14 +77,14 @@ exports.sendPasswordResetEmail = async (to, token) => {
         });
 
         if (error) {
-            console.error("Resend API Error:", error);
+            logger.error("Resend API error", { error });
             throw new Error(error.message);
         }
 
-        console.log(`Password reset email sent to ${to}. ID: ${data.id}`);
+        logger.info("Password reset email sent", { to, id: data.id });
         return data;
     } catch (error) {
-        console.error("Error sending password reset email:", error);
+        logger.error("Error sending password reset email", { message: error.message, stack: error.stack, to });
         throw new Error("Could not send password reset email");
     }
 };

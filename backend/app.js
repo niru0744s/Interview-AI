@@ -5,7 +5,6 @@ const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const cookieParser = require("cookie-parser");
-const mongoose = require("mongoose");
 const logger = require("./utils/logger");
 
 const interviewRoutes = require("./routes/interview.routes");
@@ -43,17 +42,6 @@ app.use("/api/", limiter);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Database Connection (Moved to bottom of middleware setup to avoid blocking)
-const connectDB = async () => {
-    try {
-        await mongoose.connect(process.env.MONGO_URL);
-        logger.info("Database Is connected...");
-    } catch (err) {
-        logger.error("Database connection error:", err);
-    }
-};
-connectDB();
-
 app.use("/api/interview", interviewRoutes);
 app.use("/api/auth", userAuth);
 app.use("/api/templates", templateRoutes);
@@ -61,9 +49,23 @@ app.use("/api/payment", paymentRoutes);
 
 // Centralized Error Handling
 app.use((err, req, res, next) => {
-    logger.error(`${err.status || 500} - ${err.message} - ${req.originalUrl} - ${req.method} - ${req.ip}`);
+    logger.error("Request failed", {
+        status: err.status || 500,
+        message: err.message,
+        path: req.originalUrl,
+        method: req.method,
+        ip: req.ip,
+        stack: err.stack,
+        details: err.details,
+    });
+    const status = err.status || 500;
+    const errorMessage =
+        process.env.NODE_ENV === "production" && status >= 500
+            ? "Internal Server Error"
+            : err.message;
+
     res.status(err.status || 500).json({
-        error: process.env.NODE_ENV === "production" ? "Internal Server Error" : err.message
+        error: errorMessage
     });
 });
 

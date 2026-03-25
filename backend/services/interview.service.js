@@ -1,10 +1,29 @@
+const fs = require("fs");
 const { generateQuestion, evaluateAnswer } = require("./ai.service.js");
 const Interview = require("../models/Interview.js");
 const InterviewAnswer = require("../models/InterviewAnswer.js");
+const logger = require("../utils/logger");
+const {
+  BadRequestError,
+  ConflictError,
+  NotFoundError,
+} = require("../utils/errors");
 
+const COMPLETED_STATUS = "completed";
+
+const isCompleted = (status = "") => status.toLowerCase() === COMPLETED_STATUS;
+
+const getOwnedInterview = async (interviewId, userId) => {
+  const interview = await Interview.findOne({ _id: interviewId, userId });
+  if (!interview) {
+    throw new NotFoundError("Interview Not Found");
+  }
+
+  return interview;
+};
 
 exports.startInterview = async ({ userId, role, topic, totalQuestions, resumeContent, resumeUrl, resumeData, templateId, difficulty }) => {
-  return await Interview.create({
+  return Interview.create({
     userId,
     role,
     topic: topic || "General",
@@ -15,17 +34,15 @@ exports.startInterview = async ({ userId, role, topic, totalQuestions, resumeCon
     templateId: templateId || null,
     difficulty: difficulty || "intermediate"
   });
-}
+};
 
-exports.nextQuestion = async (interviewId) => {
-  const interview = await Interview.findById(interviewId);
-  if (!interview) throw new Error("Interview Not Found");
+exports.nextQuestion = async (interviewId, userId) => {
+  const interview = await getOwnedInterview(interviewId, userId);
 
-  if (interview.status.toLowerCase() === "completed") {
+  if (isCompleted(interview.status)) {
     return null;
   }
 
-  // If there's already a current question that hasn't been answered, return it
   if (interview.currentQuestion) {
     return {
       questionId: interview.currentQuestionId || `q_${Date.now()}`,
@@ -35,9 +52,8 @@ exports.nextQuestion = async (interviewId) => {
     };
   }
 
-  const asked = await InterviewAnswer.find({ interviewId }).select("question score");
+  const asked = await InterviewAnswer.find({ interviewId }).select("question score").lean();
 
-  // Baseline Difficulty mapping
   const difficultyMap = {
     beginner: "easy",
     intermediate: "medium",
@@ -46,58 +62,75 @@ exports.nextQuestion = async (interviewId) => {
 
   let difficulty = difficultyMap[interview.difficulty] || "medium";
 
-  // Adaptive Difficulty Logic - Shift based on performance
   if (interview.currentQuestionIndex > 0 && asked.length > 0) {
     const totalScore = asked.reduce((sum, ans) => sum + (ans.score || 0), 0);
     const avgScore = totalScore / asked.length;
 
     if (avgScore > 8) difficulty = "hard";
     else if (avgScore < 5) difficulty = "easy";
-    // else stay at baseline or medium
   }
 
   const question = await generateQuestion({
     role: interview.role,
     topic: interview.topic,
     difficulty,
-    askedQuestions: asked.map(q => q.question),
+    askedQuestions: asked.map((item) => item.question),
     resumeContent: interview.resumeContent,
     resumeData: interview.resumeData
   });
 
-  const questionData = {
+  const updatedInterview = await Interview.findOneAndUpdate(
+    {
+      _id: interviewId,
+      userId,
+      currentQuestion: null,
+      status: { $in: ["in_progress", "quit", "Completed"] }
+    },
+    {
+      $set: {
+        currentQuestion: question.question,
+        currentQuestionId: question.questionId
+      }
+    },
+    { new: true }
+  );
+
+  if (!updatedInterview) {
+    const latestInterview = await getOwnedInterview(interviewId, userId);
+
+    if (latestInterview.currentQuestion) {
+      return {
+        questionId: latestInterview.currentQuestionId || `q_${Date.now()}`,
+        question: latestInterview.currentQuestion,
+        currentIndex: latestInterview.currentQuestionIndex + 1,
+        totalQuestions: latestInterview.totalQuestions
+      };
+    }
+
+    if (isCompleted(latestInterview.status)) {
+      return null;
+    }
+
+    throw new ConflictError("Question state changed. Please retry.");
+  }
+
+  return {
     ...question,
-    currentIndex: interview.currentQuestionIndex + 1, // 1-indexed for UI
-    totalQuestions: interview.totalQuestions
+    currentIndex: updatedInterview.currentQuestionIndex + 1,
+    totalQuestions: updatedInterview.totalQuestions
   };
+};
 
-  interview.currentQuestion = question.question;
-  interview.currentQuestionId = question.questionId;
-  await interview.save();
+exports.submitAnswer = async (interviewId, userId, answer) => {
+  const interview = await getOwnedInterview(interviewId, userId);
 
-  return questionData;
-}
-
-exports.submitAnswer = async (interviewId, answer) => {
-
-  const interview = await Interview.findById(interviewId);
-  if (!interview) throw new Error("Interview Not Found.");
-
-  if (interview.status.toLowerCase() === "completed") {
-    throw new Error("Interview already completed");
+  if (isCompleted(interview.status)) {
+    throw new ConflictError("Interview already completed");
   }
 
   const question = interview.currentQuestion;
-  if (!question) throw new Error("No active question found to answer");
-
-  const alreadyAnswered = await InterviewAnswer.findOne({
-    interviewId,
-    question,
-    answer: { $exists: true }
-  });
-
-  if (alreadyAnswered) {
-    throw new Error("Answer already submitted for this question");
+  if (!question) {
+    throw new BadRequestError("No active question found to answer");
   }
 
   let evaluation;
@@ -108,91 +141,143 @@ exports.submitAnswer = async (interviewId, answer) => {
       answer
     });
   } catch (err) {
-    console.error("DEBUG EVALUATION ERROR:", err);
-    require('fs').appendFileSync('eval_error.log', err.toString() + "\n" + (err.stack || '') + "\n");
-    throw new Error("Evaluation failed. Please retry.");
+    logger.error("Evaluation failed", {
+      interviewId: String(interviewId),
+      userId: String(userId),
+      message: err.message,
+      stack: err.stack
+    });
+    fs.appendFile("eval_error.log", `${err}\n${err.stack || ""}\n`, () => {});
+    throw new BadRequestError("Evaluation failed. Please retry.");
   }
 
-  await InterviewAnswer.create({
-    interviewId,
-    question,
-    answer,
-    score: evaluation.score,
-    strengths: evaluation.strengths,
-    missing_points: evaluation.missing_points,
-    ideal_answer: evaluation.ideal_answer
-  });
-
-  interview.currentQuestionIndex += 1;
-  interview.totalScore += evaluation.score;
-
-  if (interview.currentQuestionIndex >= interview.totalQuestions) {
-    interview.status = "Completed";
+  try {
+    await InterviewAnswer.create({
+      interviewId,
+      question,
+      answer,
+      score: evaluation.score,
+      strengths: evaluation.strengths,
+      missing_points: evaluation.missing_points,
+      ideal_answer: evaluation.ideal_answer
+    });
+  } catch (error) {
+    if (error.code === 11000) {
+      throw new ConflictError("Answer already submitted for this question");
+    }
+    throw error;
   }
 
-  interview.currentQuestion = null; // Clear the current question after answering
-  interview.currentQuestionId = null;
-  await interview.save();
+  const nextQuestionIndex = interview.currentQuestionIndex + 1;
+  const nextStatus = nextQuestionIndex >= interview.totalQuestions ? "Completed" : interview.status;
+
+  const updatedInterview = await Interview.findOneAndUpdate(
+    {
+      _id: interviewId,
+      userId,
+      currentQuestion: question,
+      currentQuestionId: interview.currentQuestionId,
+      status: { $ne: "Completed" }
+    },
+    {
+      $inc: {
+        currentQuestionIndex: 1,
+        totalScore: evaluation.score
+      },
+      $set: {
+        status: nextStatus,
+        currentQuestion: null,
+        currentQuestionId: null
+      }
+    },
+    { new: true }
+  );
+
+  if (!updatedInterview) {
+    throw new ConflictError("Interview state changed while saving the answer. Please refresh and retry.");
+  }
+
   return {
     ...evaluation,
-    interviewCompleted: interview.status.toLowerCase() === "completed"
+    interviewCompleted: isCompleted(updatedInterview.status)
   };
 };
 
-exports.skipQuestion = async (interviewId) => {
-  const interview = await Interview.findById(interviewId);
-  if (!interview) throw new Error("Interview Not Found");
+exports.skipQuestion = async (interviewId, userId) => {
+  const interview = await getOwnedInterview(interviewId, userId);
 
-  if (interview.status.toLowerCase() === "completed") {
-    throw new Error("Interview already completed");
+  if (isCompleted(interview.status)) {
+    throw new ConflictError("Interview already completed");
   }
 
   const question = interview.currentQuestion;
   if (!question) {
-    // If no active question, we might be in-between questions (generating next)
-    // Return a flag to tell the caller we are already moving forward
     return {
       isSkipped: false,
       alreadyProcessing: true,
-      interviewCompleted: interview.status.toLowerCase() === "completed"
+      interviewCompleted: isCompleted(interview.status)
     };
   }
 
-  await InterviewAnswer.create({
-    interviewId,
-    question,
-    answer: "SKIPPED",
-    score: 0,
-    isSkipped: true
-  });
-
-  interview.currentQuestionIndex += 1;
-  // Total score stays the same (adding 0)
-
-  if (interview.currentQuestionIndex >= interview.totalQuestions) {
-    interview.status = "Completed";
+  try {
+    await InterviewAnswer.create({
+      interviewId,
+      question,
+      answer: "SKIPPED",
+      score: 0,
+      isSkipped: true
+    });
+  } catch (error) {
+    if (error.code === 11000) {
+      throw new ConflictError("Question already answered or skipped");
+    }
+    throw error;
   }
 
-  interview.currentQuestion = null;
-  interview.currentQuestionId = null;
-  await interview.save();
+  const nextQuestionIndex = interview.currentQuestionIndex + 1;
+  const nextStatus = nextQuestionIndex >= interview.totalQuestions ? "Completed" : interview.status;
+
+  const updatedInterview = await Interview.findOneAndUpdate(
+    {
+      _id: interviewId,
+      userId,
+      currentQuestion: question,
+      currentQuestionId: interview.currentQuestionId,
+      status: { $ne: "Completed" }
+    },
+    {
+      $inc: {
+        currentQuestionIndex: 1
+      },
+      $set: {
+        status: nextStatus,
+        currentQuestion: null,
+        currentQuestionId: null
+      }
+    },
+    { new: true }
+  );
+
+  if (!updatedInterview) {
+    throw new ConflictError("Interview state changed while skipping the question. Please refresh and retry.");
+  }
 
   return {
     isSkipped: true,
-    interviewCompleted: interview.status.toLowerCase() === "completed"
+    interviewCompleted: isCompleted(updatedInterview.status)
   };
 };
 
-exports.resumeInterview = async (interviewId) => {
-  const interview = await Interview.findById(interviewId);
-  if (!interview) throw new Error("Interview not found");
+exports.resumeInterview = async (interviewId, userId) => {
+  const interview = await getOwnedInterview(interviewId, userId);
 
-  if (interview.status === "completed") {
-    throw new Error("Interview already completed");
+  if (isCompleted(interview.status)) {
+    throw new ConflictError("Interview already completed");
   }
 
   const answers = await InterviewAnswer.find({ interviewId })
-    .sort({ createdAt: 1 });
+    .sort({ createdAt: 1 })
+    .lean();
 
   return {
     interviewId,
@@ -202,13 +287,20 @@ exports.resumeInterview = async (interviewId) => {
     totalQuestions: interview.totalQuestions,
     answeredCount: answers.length
   };
-}
+};
 
-exports.getInterviewHistory = async (req, res) => {
-  const userId = req.user.id;
+exports.getInterviewHistory = async (userId) => {
+  return Interview.find({ userId })
+    .sort({ createdAt: -1 })
+    .lean();
+};
 
-  const interviews = await Interview.find({ userId })
-    .sort({ createdAt: -1 });
+exports.getInterviewResult = async (interviewId, userId) => {
+  const interview = await getOwnedInterview(interviewId, userId);
+  const answers = await InterviewAnswer.find({ interviewId }).sort({ createdAt: 1 }).lean();
 
-  res.json(interviews);
-}
+  return {
+    interview,
+    answers,
+  };
+};

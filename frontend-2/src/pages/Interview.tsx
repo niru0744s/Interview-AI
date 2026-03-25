@@ -39,7 +39,8 @@ export default function Interview() {
   const [optimisticAnswer, setOptimisticAnswer] = useState<string | null>(null);
 
   const { status, socket, error: socketError } = useSocketStateMachine(
-    import.meta.env.VITE_BACKEND_URL
+    import.meta.env.VITE_BACKEND_URL,
+    Boolean(interviewId)
   );
 
   const fetchDetails = useCallback(async () => {

@@ -77,5 +77,8 @@ const newSchema = mongoose.Schema({
     timestamps: true,
 });
 
+newSchema.index({ userId: 1, createdAt: -1 });
+newSchema.index({ templateId: 1, createdAt: -1 });
+
 const Interview = mongoose.model("Interview", newSchema);
 module.exports = Interview;

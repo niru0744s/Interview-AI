@@ -1,8 +1,19 @@
-const { startInterview, nextQuestion, submitAnswer, skipQuestion, getInterviewResult, resumeInterview } = require("../services/interview.service.js");
+const {
+  startInterview,
+  nextQuestion,
+  submitAnswer,
+  skipQuestion,
+  getInterviewResult,
+  getInterviewHistory,
+  resumeInterview
+} = require("../services/interview.service.js");
 const Interview = require("../models/Interview.js");
 const InterviewAnswer = require("../models/InterviewAnswer.js");
 const InterviewSummary = require("../models/InterviewSummary.js");
 const { generateAISummary } = require("../services/aiSummary.service.js");
+const asyncHandler = require("../utils/asyncHandler");
+const logger = require("../utils/logger");
+const { BadRequestError, ForbiddenError, NotFoundError } = require("../utils/errors");
 
 const multer = require("multer");
 const { PDFParse } = require("pdf-parse");
@@ -13,273 +24,231 @@ const { structureResume } = require("../services/ai.service");
 
 exports.startInterviewController = [
   upload.single("resumeFile"),
-  async (req, res) => {
-    try {
-      const { role, topic, totalQuestions, resumeText, templateId, difficulty } = req.body;
-      let finalResumeContent = resumeText || null;
-      let resumeUrl = null;
-      let resumeData = null;
-
-      if (req.file) {
-        try {
-          const parser = new PDFParse({ data: req.file.buffer });
-          const data = await parser.getText();
-          finalResumeContent = data.text;
-
-          const cloudRes = await uploadBufferToCloudinary(req.file.buffer);
-          resumeUrl = cloudRes.secure_url;
-        } catch (err) {
-          console.error("PDF Parse or Cloudinary Upload Error:", err);
-          // Proceed without resume data if upload fails to not block user
-        }
-      }
-
-      if (finalResumeContent) {
-        resumeData = await structureResume(finalResumeContent);
-      }
-
-      const isCustomOrResume = !templateId;
-      const tQues = totalQuestions ? parseInt(totalQuestions) : 10;
-      const requiredCredits = tQues * 10;
-
-      if (isCustomOrResume) {
-        if (req.user.plan !== "ultimate" && req.user.credits < requiredCredits) {
-          return res.status(403).json({ error: `Not enough credits. You need ${requiredCredits} credits for a ${tQues}-question interview.` });
-        }
-      }
-
-      const userId = req.user._id;
-      const interview = await startInterview({
-        userId,
-        role,
-        topic: topic || "General",
-        totalQuestions: totalQuestions ? parseInt(totalQuestions) : 10,
-        resumeContent: finalResumeContent,
-        resumeUrl,
-        resumeData,
-        templateId: templateId || null,
-        difficulty: difficulty || "intermediate"
-      });
-
-      if (isCustomOrResume && req.user.plan !== "ultimate") {
-        req.user.credits -= requiredCredits;
-        await req.user.save();
-      }
-
-      res.json({ interviewId: interview._id });
-    } catch (err) {
-      res.status(500).json({ error: err.message });
+  asyncHandler(async (req, res) => {
+    const { role, topic, totalQuestions, resumeText, templateId, difficulty } = req.body;
+    if (!role) {
+      throw new BadRequestError("role is required");
     }
-  }
+
+    const parsedQuestionCount = totalQuestions ? parseInt(totalQuestions, 10) : 10;
+    if (Number.isNaN(parsedQuestionCount) || parsedQuestionCount <= 0) {
+      throw new BadRequestError("totalQuestions must be a positive number");
+    }
+
+    let finalResumeContent = resumeText || null;
+    let resumeUrl = null;
+    let resumeData = null;
+
+    if (req.file) {
+      try {
+        const parser = new PDFParse({ data: req.file.buffer });
+        const data = await parser.getText();
+        finalResumeContent = data.text;
+
+        const cloudRes = await uploadBufferToCloudinary(req.file.buffer);
+        resumeUrl = cloudRes.secure_url;
+      } catch (err) {
+        logger.error("Resume processing failed", {
+          message: err.message,
+          stack: err.stack,
+          userId: String(req.user._id)
+        });
+      }
+    }
+
+    if (finalResumeContent) {
+      resumeData = await structureResume(finalResumeContent);
+    }
+
+    const isCustomOrResume = !templateId;
+    const requiredCredits = parsedQuestionCount * 10;
+
+    if (isCustomOrResume && req.user.plan !== "ultimate" && req.user.credits < requiredCredits) {
+      throw new ForbiddenError(`Not enough credits. You need ${requiredCredits} credits for a ${parsedQuestionCount}-question interview.`);
+    }
+
+    const interview = await startInterview({
+      userId: req.user._id,
+      role,
+      topic: topic || "General",
+      totalQuestions: parsedQuestionCount,
+      resumeContent: finalResumeContent,
+      resumeUrl,
+      resumeData,
+      templateId: templateId || null,
+      difficulty: difficulty || "intermediate"
+    });
+
+    if (isCustomOrResume && req.user.plan !== "ultimate") {
+      req.user.credits -= requiredCredits;
+      await req.user.save();
+    }
+
+    res.json({ interviewId: interview._id });
+  })
 ];
 
-exports.nextQuestionController = async (req, res) => {
-  try {
-    const { interviewId } = req.body;
-    if (!interviewId) {
-      return res.status(400).json({ error: "interviewId is required" });
-    }
-    const question = await nextQuestion(interviewId);
-    res.json({ question });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+exports.getInterviewHistoryController = asyncHandler(async (req, res) => {
+  const interviews = await getInterviewHistory(req.user._id);
+  res.json(interviews);
+});
+
+exports.nextQuestionController = asyncHandler(async (req, res) => {
+  const { interviewId } = req.body;
+  if (!interviewId) {
+    throw new BadRequestError("interviewId is required");
   }
-};
 
-exports.submitAnswerController = async (req, res) => {
-  try {
-    const { interviewId, answer } = req.body;
-    if (!interviewId || !answer) {
-      return res
-        .status(400)
-        .json({ error: "interviewId and answer are required" });
-    }
+  const question = await nextQuestion(interviewId, req.user._id);
+  res.json({ question });
+});
 
-    // Evaluation call updated to match service signature
-    const evaluation = await submitAnswer(interviewId, answer);
-    res.json(evaluation);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+exports.submitAnswerController = asyncHandler(async (req, res) => {
+  const { interviewId, answer } = req.body;
+  if (!interviewId || !answer) {
+    throw new BadRequestError("interviewId and answer are required");
   }
-};
 
-exports.skipQuestionController = async (req, res) => {
-  try {
-    const { interviewId } = req.body;
-    if (!interviewId) {
-      return res.status(400).json({ error: "interviewId is required" });
-    }
-    const result = await skipQuestion(interviewId);
-    res.json(result);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  const evaluation = await submitAnswer(interviewId, req.user._id, answer);
+  res.json(evaluation);
+});
+
+exports.skipQuestionController = asyncHandler(async (req, res) => {
+  const { interviewId } = req.body;
+  if (!interviewId) {
+    throw new BadRequestError("interviewId is required");
   }
-};
 
-exports.userQuitController = async (req, res) => {
-  try {
-    const { interviewId } = req.params;
-    const userId = req.user._id;
+  const result = await skipQuestion(interviewId, req.user._id);
+  res.json(result);
+});
 
-    const interview = await Interview.findOne({
-      _id: interviewId,
-      userId: userId
-    });
+exports.userQuitController = asyncHandler(async (req, res) => {
+  const { interviewId } = req.params;
+  const interview = await Interview.findOne({ _id: interviewId, userId: req.user._id });
 
-    if (!interview) {
-      return res.status(404).json({ message: "Interview not found" });
-    }
+  if (!interview) {
+    throw new NotFoundError("Interview not found");
+  }
 
-    if (interview.status === "quit" || interview.status === "Completed") {
-      return res.status(200).json({
-        message: "Interview already finalized",
-        status: interview.status
-      });
-    }
-
-    interview.status = "quit";
-    interview.endedReason = "user_terminated";
-    interview.endedAt = new Date();
-
-    await interview.save();
-
+  if (interview.status === "quit" || interview.status === "Completed") {
     return res.status(200).json({
-      message: "Interview quit successfully",
-      interviewId,
+      message: "Interview already finalized",
       status: interview.status
     });
+  }
 
-  } catch (error) {
-    return res.status(500).json({
-      message: "Failed to quit interview",
-      error: error.message
+  interview.status = "quit";
+  interview.endedReason = "user_terminated";
+  interview.endedAt = new Date();
+  await interview.save();
+
+  return res.status(200).json({
+    message: "Interview quit successfully",
+    interviewId,
+    status: interview.status
+  });
+});
+
+exports.getInterviewResultController = asyncHandler(async (req, res) => {
+  const result = await getInterviewResult(req.params.id, req.user._id);
+  res.json(result);
+});
+
+exports.resumeInterviewController = asyncHandler(async (req, res) => {
+  const resume = await resumeInterview(req.params.id, req.user._id);
+  res.json(resume);
+});
+
+exports.generateInterviewSummaryController = asyncHandler(async (req, res) => {
+  const { interviewId } = req.params;
+  const userId = req.user._id;
+
+  const interview = await Interview.findOne({ _id: interviewId, userId });
+  if (!interview) {
+    throw new NotFoundError("Interview not found");
+  }
+
+  const existingSummary = await InterviewSummary.findOne({ interview: interviewId });
+  if (existingSummary) {
+    return res.status(200).json({
+      message: "Summary already generated",
+      summary: existingSummary,
+      interview
     });
   }
-};
 
-exports.getInterviewResultController = async (req, res) => {
+  if (interview.status === "in_progress") {
+    throw new BadRequestError("Interview is still in progress");
+  }
+
+  const answers = await InterviewAnswer.find({ interviewId });
+  const interviewPayload = {
+    totalQuestions: interview.totalQuestions,
+    answers,
+    status: interview.status,
+    quitReason: interview.endedReason || null,
+    startedAt: interview.createdAt,
+    endedAt: interview.updatedAt
+  };
+
+  const aiResult = await generateAISummary(interviewPayload);
+
   try {
-    const result = await getInterviewResult(req.params.id);
-    res.json(result);
+    const summaryDoc = await InterviewSummary.create({
+      interview: interviewId,
+      user: userId,
+      score: aiResult.score,
+      strengths: aiResult.strengths,
+      weaknesses: aiResult.weaknesses,
+      verdict: aiResult.verdict,
+      feedback: aiResult.feedback
+    });
+
+    interview.summaryGenerated = true;
+    interview.finalizedAt = new Date();
+    await interview.save();
+
+    return res.status(201).json({
+      message: "Interview summary generated",
+      summary: summaryDoc,
+      interview
+    });
   } catch (err) {
-    res.status(404).json({ error: err.message });
-  }
-};
-
-exports.resumeInterviewController = async (req, res) => {
-  try {
-    const resume = await resumeInterview(req.params.id);
-    res.json(resume);
-  } catch (error) {
-    res.status(404).json({ error: error.message });
-  }
-};
-
-exports.generateInterviewSummaryController = async (req, res) => {
-  try {
-    const { interviewId } = req.params;
-    const userId = req.user._id;
-
-    const interview = await Interview.findOne({
-      _id: interviewId,
-      userId: userId
-    });
-
-    if (!interview) {
-      return res.status(404).json({ message: "Interview not found" });
-    }
-
-    const existingSummary = await InterviewSummary.findOne({ interview: interviewId });
-    if (existingSummary) {
-      return res.status(200).json({
-        message: "Summary already generated",
-        summary: existingSummary,
-        interview
-      });
-    }
-
-    if (interview.status === "in_progress") {
-      return res.status(400).json({
-        message: "Interview is still in progress"
-      });
-    }
-
-    // Fetch answers accurately from the dedicated collection
-    const answers = await InterviewAnswer.find({ interviewId });
-
-    const interviewPayload = {
-      totalQuestions: interview.totalQuestions,
-      answers: answers,
-      status: interview.status,
-      quitReason: interview.endedReason || null,
-      startedAt: interview.createdAt,
-      endedAt: interview.updatedAt
-    };
-
-    const aiResult = await generateAISummary(interviewPayload);
-
-    try {
-      const summaryDoc = await InterviewSummary.create({
-        interview: interviewId,
-        user: userId,
-        score: aiResult.score,
-        strengths: aiResult.strengths,
-        weaknesses: aiResult.weaknesses,
-        verdict: aiResult.verdict,
-        feedback: aiResult.feedback
-      });
-
-      interview.summaryGenerated = true;
-      interview.finalizedAt = new Date();
-      await interview.save();
-
-      return res.status(201).json({
-        message: "Interview summary generated",
-        summary: summaryDoc,
-        interview
-      });
-    } catch (err) {
-      // Handle race condition: If two requests hit simultaneously, one might fail with duplicate key error E11000
-      if (err.code === 11000) {
-        const existing = await InterviewSummary.findOne({ interview: interviewId });
-        if (existing) {
-          return res.status(200).json({
-            message: "Summary already exists (concurrency handled)",
-            summary: existing,
-            interview
-          });
-        }
+    if (err.code === 11000) {
+      const existing = await InterviewSummary.findOne({ interview: interviewId });
+      if (existing) {
+        return res.status(200).json({
+          message: "Summary already exists (concurrency handled)",
+          summary: existing,
+          interview
+        });
       }
-      throw err; // Rethrow if it's not a duplicate key error
     }
 
-  } catch (err) {
-    console.error("Interview summary error:", err);
-    return res.status(500).json({
-      message: err.message || "Failed to generate interview summary"
+    logger.error("Interview summary error", {
+      message: err.message,
+      stack: err.stack,
+      interviewId,
+      userId: String(userId)
     });
+    throw err;
   }
-};
+});
 
-exports.getInterviewDetailController = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const userId = req.user._id;
-
-    const interview = await Interview.findOne({ _id: id, userId });
-    if (!interview) {
-      return res.status(404).json({ message: "Interview not found" });
-    }
-
-    const answers = await InterviewAnswer.find({ interviewId: id }).sort({ createdAt: 1 });
-    const summary = await InterviewSummary.findOne({ interview: id });
-
-    res.json({
-      interview,
-      answers,
-      summary
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+exports.getInterviewDetailController = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const interview = await Interview.findOne({ _id: id, userId: req.user._id });
+  if (!interview) {
+    throw new NotFoundError("Interview not found");
   }
-};
+
+  const answers = await InterviewAnswer.find({ interviewId: id }).sort({ createdAt: 1 });
+  const summary = await InterviewSummary.findOne({ interview: id });
+
+  res.json({
+    interview,
+    answers,
+    summary
+  });
+});

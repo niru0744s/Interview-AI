@@ -17,7 +17,7 @@ async function main() {
         console.log("Sending...");
         const info = await transporter.sendMail({
             from: process.env.EMAIL,
-            to: process.env.EMAIL, // Send to self
+            to: process.env.EMAIL,
             subject: "Test Email from Interview AI",
             text: "If you receive this, Nodemailer is configured correctly.",
         });

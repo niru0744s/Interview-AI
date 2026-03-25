@@ -1,99 +1,103 @@
+import { Suspense, lazy, type ReactNode } from "react";
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import ProtectedRoute from "../components/ProtectedRoute";
-import Interview from "../pages/Interview";
 import RouteError from "../components/RouteError";
-import Landing from "../pages/Landing";
-import Login from "../pages/Login";
-import Signup from "../pages/Signup";
-import Interviews from "../pages/Interviews";
-import Summary from "../pages/Summary";
-import ReviewSession from "../pages/ReviewSession";
-import RecruiterDashboard from "../pages/RecruiterDashboard";
-import InvitePage from "../pages/InvitePage";
-import JobResults from "../pages/JobResults";
-import VerifyEmail from "../pages/VerifyEmail";
-import ForgotPassword from "../pages/ForgotPassword";
-import ResetPassword from "../pages/ResetPassword";
-import Settings from "../pages/Settings";
-import Pricing from "../pages/Pricing";
-
 import Layout from "../components/Layout";
 
-export const router = createBrowserRouter([
-    {
-        path: "/",
-        element: <Landing />,
-        errorElement: <RouteError />
-    },
-    {
-        path: "/invite/:code",
-        element: <Layout><InvitePage /></Layout>
-    },
-    {
-        path: "/recruiter",
-        element: (<ProtectedRoute role="recruiter"><Layout><RecruiterDashboard /></Layout></ProtectedRoute>),
-        errorElement: <RouteError />
-    },
-    {
-        path: "/job/:templateId/results",
-        element: (<ProtectedRoute role="recruiter"><Layout><JobResults /></Layout></ProtectedRoute>),
-        errorElement: <RouteError />
-    },
-    {
-        path: "/login",
-        element: <Layout><Login /></Layout>
-    },
-    {
-        path: "/signup",
-        element: <Layout><Signup /></Layout>
-    },
-    {
-        path: "/verify-email",
-        element: <Layout><VerifyEmail /></Layout>
-    },
-    {
-        path: "/forgot-password",
-        element: <Layout><ForgotPassword /></Layout>,
-        errorElement: <RouteError />
-    },
-    {
-        path: "/reset-password",
-        element: <Layout><ResetPassword /></Layout>,
-        errorElement: <RouteError />
-    },
-    {
-        path: "/settings",
-        element: <Layout><Settings /></Layout>,
-        errorElement: <RouteError />
-    },
-    {
-        path: "/pricing",
-        element: <Layout><Pricing /></Layout>,
-        errorElement: <RouteError />
-    },
+const Landing = lazy(() => import("../pages/Landing"));
+const Login = lazy(() => import("../pages/Login"));
+const Signup = lazy(() => import("../pages/Signup"));
+const Interviews = lazy(() => import("../pages/Interviews"));
+const Interview = lazy(() => import("../pages/Interview"));
+const Summary = lazy(() => import("../pages/Summary"));
+const ReviewSession = lazy(() => import("../pages/ReviewSession"));
+const RecruiterDashboard = lazy(() => import("../pages/RecruiterDashboard"));
+const InvitePage = lazy(() => import("../pages/InvitePage"));
+const JobResults = lazy(() => import("../pages/JobResults"));
+const VerifyEmail = lazy(() => import("../pages/VerifyEmail"));
+const ForgotPassword = lazy(() => import("../pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("../pages/ResetPassword"));
+const Settings = lazy(() => import("../pages/Settings"));
+const Pricing = lazy(() => import("../pages/Pricing"));
 
-    {
-        path: "/interviews",
-        element: (<ProtectedRoute role="candidate"><Layout><Interviews /></Layout></ProtectedRoute>),
-        errorElement: <RouteError />
-    },
-    {
-        path: "/interview/:interviewId",
-        element: (<ProtectedRoute><Interview /></ProtectedRoute>),
-        errorElement: <RouteError />
-    },
-    {
-        path: "/summary/:interviewId",
-        element: (<ProtectedRoute><Layout><Summary /></Layout></ProtectedRoute>),
-        errorElement: <RouteError />
-    },
-    {
-        path: "/review/:interviewId",
-        element: (<ProtectedRoute><Layout><ReviewSession /></Layout></ProtectedRoute>),
-        errorElement: <RouteError />
-    },
-    {
-        path: "*",
-        element: <Navigate to="/" replace />
-    }
+const withSuspense = (element: ReactNode) => (
+  <Suspense fallback={null}>{element}</Suspense>
+);
+
+export const router = createBrowserRouter([
+  {
+    path: "/",
+    element: withSuspense(<Landing />),
+    errorElement: <RouteError />
+  },
+  {
+    path: "/invite/:code",
+    element: withSuspense(<Layout><InvitePage /></Layout>)
+  },
+  {
+    path: "/recruiter",
+    element: withSuspense(<ProtectedRoute role="recruiter"><Layout><RecruiterDashboard /></Layout></ProtectedRoute>),
+    errorElement: <RouteError />
+  },
+  {
+    path: "/job/:templateId/results",
+    element: withSuspense(<ProtectedRoute role="recruiter"><Layout><JobResults /></Layout></ProtectedRoute>),
+    errorElement: <RouteError />
+  },
+  {
+    path: "/login",
+    element: withSuspense(<Layout><Login /></Layout>)
+  },
+  {
+    path: "/signup",
+    element: withSuspense(<Layout><Signup /></Layout>)
+  },
+  {
+    path: "/verify-email",
+    element: withSuspense(<Layout><VerifyEmail /></Layout>)
+  },
+  {
+    path: "/forgot-password",
+    element: withSuspense(<Layout><ForgotPassword /></Layout>),
+    errorElement: <RouteError />
+  },
+  {
+    path: "/reset-password",
+    element: withSuspense(<Layout><ResetPassword /></Layout>),
+    errorElement: <RouteError />
+  },
+  {
+    path: "/settings",
+    element: withSuspense(<Layout><Settings /></Layout>),
+    errorElement: <RouteError />
+  },
+  {
+    path: "/pricing",
+    element: withSuspense(<Layout><Pricing /></Layout>),
+    errorElement: <RouteError />
+  },
+  {
+    path: "/interviews",
+    element: withSuspense(<ProtectedRoute role="candidate"><Layout><Interviews /></Layout></ProtectedRoute>),
+    errorElement: <RouteError />
+  },
+  {
+    path: "/interview/:interviewId",
+    element: withSuspense(<ProtectedRoute><Interview /></ProtectedRoute>),
+    errorElement: <RouteError />
+  },
+  {
+    path: "/summary/:interviewId",
+    element: withSuspense(<ProtectedRoute><Layout><Summary /></Layout></ProtectedRoute>),
+    errorElement: <RouteError />
+  },
+  {
+    path: "/review/:interviewId",
+    element: withSuspense(<ProtectedRoute><Layout><ReviewSession /></Layout></ProtectedRoute>),
+    errorElement: <RouteError />
+  },
+  {
+    path: "*",
+    element: <Navigate to="/" replace />
+  }
 ]);
