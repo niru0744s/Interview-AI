@@ -38,12 +38,9 @@ const newSchema = mongoose.Schema({
     timestamps: true
 });
 
-// Middleware to delete all user-related data when user is deleted
-// Middleware to delete all user-related data when user is deleted
-newSchema.pre("findOneAndDelete", async function () {
+async function deleteAssociatedUserData(user) {
     try {
-        const user = await this.model.findOne(this.getQuery());
-        if (!user) return; // If no user found, nothing to do
+        if (!user) return;
 
         const Interview = require("./Interview");
         const InterviewAnswer = require("./InterviewAnswer");
@@ -70,12 +67,17 @@ newSchema.pre("findOneAndDelete", async function () {
 
     } catch (err) {
         console.error("Error in pre-delete hook:", err);
-        // We throw so Mongoose catches it and aborts the delete if needed, 
-        // or at least logs it properly. 
-        // However, throwing here might block the user deletion if we aren't careful. 
-        // But preventing user deletion when cleanup fails is probably safer than leaving orphan data.
         throw err;
     }
+}
+
+newSchema.pre("findOneAndDelete", async function () {
+    const user = await this.model.findOne(this.getQuery());
+    await deleteAssociatedUserData(user);
+});
+
+newSchema.pre("deleteOne", { document: true, query: false }, async function () {
+    await deleteAssociatedUserData(this);
 });
 
 const User = mongoose.model("User", newSchema);
