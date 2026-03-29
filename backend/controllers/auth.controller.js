@@ -107,10 +107,11 @@ exports.switchRole = asyncHandler(async (req, res) => {
 });
 
 exports.deleteAccount = asyncHandler(async (req, res) => {
-  const userId = req.user._id;
-  const User = require("../models/User");
+  if (!req.user) {
+    throw new NotFoundError("User not found");
+  }
 
-  await User.findByIdAndDelete(userId);
+  await req.user.deleteOne();
 
   res.clearCookie("token");
   res.json({ message: "Account and all associated data deleted successfully." });
