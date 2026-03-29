@@ -49,22 +49,33 @@ app.use("/api/payment", paymentRoutes);
 
 // Centralized Error Handling
 app.use((err, req, res, next) => {
-    logger.error("Request failed", {
-        status: err.status || 500,
+    const status = err.status || 500;
+    const logPayload = {
+        status,
         message: err.message,
         path: req.originalUrl,
         method: req.method,
         ip: req.ip,
-        stack: err.stack,
         details: err.details,
-    });
-    const status = err.status || 500;
+    };
+
+    if (status >= 500) {
+        logger.error("Request failed", {
+            ...logPayload,
+            stack: err.stack,
+        });
+    } else if (status === 401 || status === 403) {
+        logger.info("Auth request rejected", logPayload);
+    } else {
+        logger.warn("Client request failed", logPayload);
+    }
+
     const errorMessage =
         process.env.NODE_ENV === "production" && status >= 500
             ? "Internal Server Error"
             : err.message;
 
-    res.status(err.status || 500).json({
+    res.status(status).json({
         error: errorMessage
     });
 });

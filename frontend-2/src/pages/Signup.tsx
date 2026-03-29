@@ -27,6 +27,8 @@ export default function Signup() {
 
     const { } = useAuth();
     const navigate = useNavigate();
+    const isPasswordStrong = strength === 100;
+    const canSubmit = Boolean(name && email && password) && isPasswordStrong && !loading;
 
     const checkStrength = (pass: string) => {
         let score = 0;
@@ -57,7 +59,7 @@ export default function Signup() {
             return;
         }
 
-        if (strength < 100) {
+        if (!isPasswordStrong) {
             const msg = "Password is too weak. Please meet all requirements.";
             setError(msg);
             toast.warning(msg);
@@ -242,7 +244,7 @@ export default function Signup() {
                                         "w-full h-14 rounded-2xl font-black text-lg transition-all duration-300 shadow-xl text-white outline-none",
                                         "btn-premium glow-primary"
                                     )}
-                                    disabled={loading}
+                                    disabled={!canSubmit}
                                 >
                                     {loading ? (
                                         <div className="flex items-center gap-2 text-sm uppercase tracking-widest">
