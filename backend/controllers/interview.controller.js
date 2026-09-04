@@ -86,6 +86,11 @@ exports.startInterviewController = [
       creditsDeducted = true;
     }
 
+    const ALLOWED_DIFFICULTIES = ["beginner", "intermediate", "professional"];
+    const sanitizedDifficulty = (typeof difficulty === "string" && ALLOWED_DIFFICULTIES.includes(difficulty.toLowerCase()))
+      ? difficulty.toLowerCase()
+      : "intermediate";
+
     let interview;
     try {
       interview = await startInterview({
@@ -97,7 +102,7 @@ exports.startInterviewController = [
         resumeUrl,
         resumeData,
         templateId: templateId || null,
-        difficulty: difficulty || "intermediate"
+        difficulty: sanitizedDifficulty
       });
     } catch (err) {
       // Rollback deducted credits if interview creation fails

@@ -6,12 +6,21 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription }
 import { cn } from "../../lib/utils";
 import { PREDEFINED_ROLES, TOPICS_MAPPING } from "../../utils/constants";
 import ResumeUpload from "./ResumeUpload";
-import { Target, FileText, ChevronLeft, Rocket, Briefcase, Zap } from "lucide-react";
+import { Target, FileText, ChevronLeft, Rocket, Briefcase, Zap, Gauge } from "lucide-react";
 import { toast } from "sonner";
+
+export type DifficultyLevel = "beginner" | "intermediate" | "professional";
 
 interface InterviewConfigDialogProps {
     onCancel: () => void;
-    onLaunch: (payload: { role: string; topic: string; totalQuestions: number; resumeFile: File | null; resumeText: string }) => void;
+    onLaunch: (payload: {
+        role: string;
+        topic: string;
+        totalQuestions: number;
+        difficulty: DifficultyLevel;
+        resumeFile: File | null;
+        resumeText: string;
+    }) => void;
     isCreating: boolean;
 }
 
@@ -23,6 +32,7 @@ export default function InterviewConfigDialog({ onCancel, onLaunch, isCreating }
     const [customRole, setCustomRole] = useState<string>("");
     const [selectedTopic, setSelectedTopic] = useState<string>(TOPICS_MAPPING[PREDEFINED_ROLES[0]][0]);
     const [customTopic, setCustomTopic] = useState<string>("");
+    const [difficulty, setDifficulty] = useState<DifficultyLevel>("intermediate");
     const [totalQuestions, setTotalQuestions] = useState<number>(10);
     const [resumeData, setResumeData] = useState<{ file: File | null; text: string }>({ file: null, text: "" });
 
@@ -53,6 +63,7 @@ export default function InterviewConfigDialog({ onCancel, onLaunch, isCreating }
             role: finalRole,
             topic: finalTopic,
             totalQuestions,
+            difficulty,
             resumeFile: resumeData.file,
             resumeText: resumeData.text
         });
@@ -164,6 +175,38 @@ export default function InterviewConfigDialog({ onCancel, onLaunch, isCreating }
                         className="h-12 bg-background/50 border-white/10 rounded-xl"
                     />
                 )}
+            </div>
+
+            <div className="space-y-3">
+                <Label className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground/60 flex items-center gap-2">
+                    <Gauge className="h-3 w-3" /> Difficulty Level
+                </Label>
+                <div className="grid grid-cols-3 gap-2">
+                    {[
+                        { id: "beginner" as const, label: "Beginner", desc: "Core fundamentals" },
+                        { id: "intermediate" as const, label: "Intermediate", desc: "Industry standard" },
+                        { id: "professional" as const, label: "Professional", desc: "Deep & Complex" }
+                    ].map((d) => (
+                        <Button
+                            key={d.id}
+                            type="button"
+                            variant={difficulty === d.id ? "default" : "outline"}
+                            className={cn(
+                                "h-auto py-3 px-3 flex flex-col items-center justify-center gap-1 text-xs font-bold transition-all rounded-xl border-white/10",
+                                difficulty === d.id && "btn-premium text-white border-transparent"
+                            )}
+                            onClick={() => setDifficulty(d.id)}
+                        >
+                            <span className="font-black uppercase tracking-wider">{d.label}</span>
+                            <span className={cn(
+                                "text-[10px] font-medium opacity-70",
+                                difficulty === d.id ? "text-white/80" : "text-muted-foreground"
+                            )}>
+                                {d.desc}
+                            </span>
+                        </Button>
+                    ))}
+                </div>
             </div>
 
             {renderCommonSetup()}

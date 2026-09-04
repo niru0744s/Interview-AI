@@ -23,6 +23,7 @@ export default function Interviews() {
     role: string;
     topic: string;
     totalQuestions: number;
+    difficulty?: string;
     resumeFile: File | null;
     resumeText: string;
   }) => {
@@ -46,6 +47,9 @@ export default function Interviews() {
       formData.append("role", payload.role);
       formData.append("topic", payload.topic);
       formData.append("totalQuestions", payload.totalQuestions.toString());
+      if (payload.difficulty) {
+        formData.append("difficulty", payload.difficulty);
+      }
 
       if (payload.resumeFile) {
         formData.append("resumeFile", payload.resumeFile);
