@@ -13,15 +13,24 @@ exports.registerUser = async ({ email, password }) => {
 
   const hashedPassword = await bcrypt.hash(password, 12);
   const verificationToken = crypto.randomBytes(32).toString("hex");
+  let user;
 
-  const user = await User.create({
-    email,
-    password: hashedPassword,
-    verificationToken,
-    isVerified: false
-  });
+  try {
+    user = await User.create({
+      email,
+      password: hashedPassword,
+      verificationToken,
+      isVerified: false
+    });
 
-  await sendVerificationEmail(email, verificationToken);
+    await sendVerificationEmail(email, verificationToken);
+  } catch (error) {
+    if (user) {
+      await user.deleteOne();
+    }
+
+    throw new BadRequestError("Could not send verification email. Please try again later.");
+  }
 
   return { user };
 }

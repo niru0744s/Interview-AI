@@ -10,6 +10,7 @@ const {
 const Interview = require("../models/Interview.js");
 const InterviewAnswer = require("../models/InterviewAnswer.js");
 const InterviewSummary = require("../models/InterviewSummary.js");
+const User = require("../models/User.js");
 const { generateAISummary } = require("../services/aiSummary.service.js");
 const asyncHandler = require("../utils/asyncHandler");
 const logger = require("../utils/logger");
@@ -63,25 +64,47 @@ exports.startInterviewController = [
     const isCustomOrResume = !templateId;
     const requiredCredits = parsedQuestionCount * 10;
 
-    if (isCustomOrResume && req.user.plan !== "ultimate" && req.user.credits < requiredCredits) {
-      throw new ForbiddenError(`Not enough credits. You need ${requiredCredits} credits for a ${parsedQuestionCount}-question interview.`);
+    // Check if user has an active ultimate plan
+    const isPlanActive = req.user.planExpiresAt && new Date(req.user.planExpiresAt) > new Date();
+    const isUltimate = req.user.plan === "ultimate" && isPlanActive;
+
+    let creditsDeducted = false;
+
+    if (isCustomOrResume && !isUltimate) {
+      // Atomically check and deduct credits to prevent double-spending race conditions
+      const updatedUser = await User.findOneAndUpdate(
+        { _id: req.user._id, credits: { $gte: requiredCredits } },
+        { $inc: { credits: -requiredCredits } },
+        { new: true }
+      );
+
+      if (!updatedUser) {
+        throw new ForbiddenError(`Not enough credits. You need ${requiredCredits} credits for a ${parsedQuestionCount}-question interview.`);
+      }
+
+      req.user.credits = updatedUser.credits;
+      creditsDeducted = true;
     }
 
-    const interview = await startInterview({
-      userId: req.user._id,
-      role,
-      topic: topic || "General",
-      totalQuestions: parsedQuestionCount,
-      resumeContent: finalResumeContent,
-      resumeUrl,
-      resumeData,
-      templateId: templateId || null,
-      difficulty: difficulty || "intermediate"
-    });
-
-    if (isCustomOrResume && req.user.plan !== "ultimate") {
-      req.user.credits -= requiredCredits;
-      await req.user.save();
+    let interview;
+    try {
+      interview = await startInterview({
+        userId: req.user._id,
+        role,
+        topic: topic || "General",
+        totalQuestions: parsedQuestionCount,
+        resumeContent: finalResumeContent,
+        resumeUrl,
+        resumeData,
+        templateId: templateId || null,
+        difficulty: difficulty || "intermediate"
+      });
+    } catch (err) {
+      // Rollback deducted credits if interview creation fails
+      if (creditsDeducted) {
+        await User.findByIdAndUpdate(req.user._id, { $inc: { credits: requiredCredits } });
+      }
+      throw err;
     }
 
     res.json({ interviewId: interview._id });

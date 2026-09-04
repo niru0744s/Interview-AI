@@ -18,8 +18,14 @@ cron.schedule("0 0 * * *", async () => {
             console.log(`[CRON] Found ${expiredUsers.length} users with expired plans. Downgrading to free...`);
 
             for (const user of expiredUsers) {
+                if (user.plan === "ultimate") {
+                    // Reset synthetic unlimited credits to free tier baseline
+                    user.credits = 500;
+                } else {
+                    // Preserve legitimately purchased, unspent credits
+                    user.credits = Math.max(user.credits || 0, 0);
+                }
                 user.plan = "free";
-                user.credits = 500;
                 user.planExpiresAt = null;
                 await user.save();
             }

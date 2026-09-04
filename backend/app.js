@@ -22,9 +22,26 @@ app.use(cors({
     maxAge: 86400
 }));
 
-app.use(helmet({
-    crossOriginResourcePolicy: { policy: "cross-origin" }
-}));
+app.use(
+    helmet({
+        crossOriginResourcePolicy: {
+            policy: "cross-origin"
+        },
+
+        frameguard: false,
+
+        contentSecurityPolicy: {
+            directives: {
+                ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+
+                "frame-ancestors": [
+                    "'self'",
+                    "https://tryvarta.com"
+                ]
+            }
+        }
+    })
+);
 app.use(cookieParser());
 
 // Health Check
