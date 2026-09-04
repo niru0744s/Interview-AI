@@ -1,6 +1,7 @@
 const { getRazorpayInstance } = require("../services/payment.service");
 const crypto = require("crypto");
 const User = require("../models/User");
+const Payment = require("../models/Payment");
 
 const PLAN_PRICES = {
     standard: 200, // 200 INR
@@ -38,6 +39,16 @@ exports.createOrderController = async (req, res) => {
             return res.status(500).json({ error: "Failed to create order" });
         }
 
+        // Store order in Payment collection for tracking and verification
+        await Payment.create({
+            userId: req.user._id,
+            orderId: order.id,
+            planId,
+            amount: PLAN_PRICES[planId],
+            currency: "INR",
+            status: "created"
+        });
+
         res.json({
             orderId: order.id,
             amount: amount,
@@ -54,14 +65,30 @@ exports.verifyPaymentController = async (req, res) => {
         const {
             razorpay_order_id,
             razorpay_payment_id,
-            razorpay_signature,
-            planId
+            razorpay_signature
         } = req.body;
 
         const userId = req.user._id;
 
-        if (!PLAN_PRICES[planId]) {
-            return res.status(400).json({ error: "Invalid plan ID" });
+        if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+            return res.status(400).json({ error: "Missing required payment details" });
+        }
+
+        // Find the order record
+        const paymentRecord = await Payment.findOne({ orderId: razorpay_order_id, userId });
+        if (!paymentRecord) {
+            return res.status(404).json({ error: "Order not found" });
+        }
+
+        // Prevent replay attacks
+        if (paymentRecord.status === "paid") {
+            return res.status(400).json({ error: "Payment has already been verified and processed" });
+        }
+
+        // Use verified planId from database rather than trusting client request body
+        const verifiedPlanId = paymentRecord.planId;
+        if (!PLAN_PRICES[verifiedPlanId]) {
+            return res.status(400).json({ error: "Invalid plan ID on record" });
         }
 
         const secret = process.env.RAZORPAY_KEY_SECRET || "mock_key_secret";
@@ -74,8 +101,15 @@ exports.verifyPaymentController = async (req, res) => {
             .digest("hex");
 
         if (razorpay_signature !== expectedSign) {
+            paymentRecord.status = "failed";
+            await paymentRecord.save();
             return res.status(400).json({ error: "Invalid payment signature" });
         }
+
+        // Mark payment as paid before allocating credits
+        paymentRecord.paymentId = razorpay_payment_id;
+        paymentRecord.status = "paid";
+        await paymentRecord.save();
 
         // Signature is valid. Update user's plan and credits.
         const user = await User.findById(userId);
@@ -83,8 +117,8 @@ exports.verifyPaymentController = async (req, res) => {
             return res.status(404).json({ error: "User not found" });
         }
 
-        user.plan = planId;
-        user.credits = planId === 'ultimate' ? PLAN_CREDITS.ultimate : (user.credits || 0) + PLAN_CREDITS[planId];
+        user.plan = verifiedPlanId;
+        user.credits = verifiedPlanId === 'ultimate' ? PLAN_CREDITS.ultimate : (user.credits || 0) + PLAN_CREDITS[verifiedPlanId];
         user.planExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
 
         await user.save();
@@ -115,8 +149,12 @@ exports.cancelPlanController = async (req, res) => {
             return res.status(400).json({ error: "You do not have an active premium plan to cancel." });
         }
 
+        // If canceling ultimate tier, reset synthetic unlimited credits back to free baseline
+        if (user.plan === 'ultimate') {
+            user.credits = 500;
+        }
+
         user.plan = 'free';
-        // Note: As requested, credits are maintained (user.credits = user.credits)
         // Reset the expiration date since they no longer have a premium plan
         user.planExpiresAt = null;
 

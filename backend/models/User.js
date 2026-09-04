@@ -46,6 +46,7 @@ async function deleteAssociatedUserData(user) {
         const InterviewAnswer = require("./InterviewAnswer");
         const InterviewSummary = require("./InterviewSummary");
         const JobTemplate = require("./JobTemplate");
+        const Payment = require("./Payment");
 
         // 1. Find all interviews by this user
         const userInterviews = await Interview.find({ userId: user._id });
@@ -64,6 +65,9 @@ async function deleteAssociatedUserData(user) {
 
         // 5. Delete all job templates created by this recruiter
         await JobTemplate.deleteMany({ recruiterId: user._id });
+
+        // 6. Delete all payment transactions
+        await Payment.deleteMany({ userId: user._id });
 
     } catch (err) {
         console.error("Error in pre-delete hook:", err);

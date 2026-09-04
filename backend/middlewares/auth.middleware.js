@@ -17,6 +17,16 @@ exports.requireAuth = async (req, res, next) => {
       return next(new UnauthorizedError("Invalid token"));
     }
 
+    // Lazy sync: check if paid plan has expired in real-time
+    if (user.plan !== "free" && user.planExpiresAt && new Date(user.planExpiresAt) <= new Date()) {
+      if (user.plan === "ultimate") {
+        user.credits = 500;
+      }
+      user.plan = "free";
+      user.planExpiresAt = null;
+      await user.save();
+    }
+
     req.user = user;
     next();
   } catch (err) {

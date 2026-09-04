@@ -79,8 +79,9 @@ export default function Signup() {
                 navigate("/login");
             }
         } catch (err: unknown) {
-            const errorData = (err as { response?: { data?: { message?: string } } }).response?.data;
-            const message = errorData?.message || "Registration failed. Try a different email.";
+            const message =
+                (err as { message?: string }).message ||
+                "Registration failed. Try again.";
             setError(message);
             toast.error(message);
         } finally {
