@@ -66,6 +66,7 @@ export default function InvitePage() {
                 topic: template.topic,
                 totalQuestions: template.totalQuestions,
                 difficulty: template.difficulty,
+                questionFormat: template.questionFormat || "blend",
                 templateId: template._id
             });
 

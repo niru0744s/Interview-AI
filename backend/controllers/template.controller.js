@@ -5,10 +5,15 @@ const crypto = require("crypto");
 // Create a new job template
 exports.createTemplate = async (req, res) => {
     try {
-        const { title, role, topic, description, totalQuestions, difficulty } = req.body;
+        const { title, role, topic, description, totalQuestions, difficulty, questionFormat } = req.body;
         const recruiterId = req.user._id; // Assuming auth middleware attaches user
 
         const inviteCode = crypto.randomBytes(4).toString("hex").toUpperCase();
+
+        const ALLOWED_FORMATS = ["blend", "mcq", "coding", "conceptual"];
+        const sanitizedFormat = (typeof questionFormat === "string" && ALLOWED_FORMATS.includes(questionFormat.toLowerCase()))
+            ? questionFormat.toLowerCase()
+            : "blend";
 
         const template = await JobTemplate.create({
             recruiterId,
@@ -18,6 +23,7 @@ exports.createTemplate = async (req, res) => {
             description,
             totalQuestions: totalQuestions ? parseInt(totalQuestions) : 10,
             difficulty: difficulty || "intermediate",
+            questionFormat: sanitizedFormat,
             inviteCode
         });
 

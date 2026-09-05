@@ -22,7 +22,7 @@ const getOwnedInterview = async (interviewId, userId) => {
   return interview;
 };
 
-exports.startInterview = async ({ userId, role, topic, totalQuestions, resumeContent, resumeUrl, resumeData, templateId, difficulty }) => {
+exports.startInterview = async ({ userId, role, topic, totalQuestions, resumeContent, resumeUrl, resumeData, templateId, difficulty, questionFormat }) => {
   return Interview.create({
     userId,
     role,
@@ -32,7 +32,8 @@ exports.startInterview = async ({ userId, role, topic, totalQuestions, resumeCon
     resumeUrl: resumeUrl || null,
     resumeData: resumeData || null,
     templateId: templateId || null,
-    difficulty: difficulty || "intermediate"
+    difficulty: difficulty || "intermediate",
+    questionFormat: questionFormat || "blend"
   });
 };
 
@@ -47,6 +48,10 @@ exports.nextQuestion = async (interviewId, userId) => {
     return {
       questionId: interview.currentQuestionId || `q_${Date.now()}`,
       question: interview.currentQuestion,
+      type: interview.currentQuestionType || "conceptual",
+      options: interview.currentQuestionOptions || [],
+      codeTemplate: interview.currentQuestionMeta?.codeTemplate || null,
+      language: interview.currentQuestionMeta?.language || null,
       currentIndex: interview.currentQuestionIndex + 1,
       totalQuestions: interview.totalQuestions
     };
@@ -70,14 +75,38 @@ exports.nextQuestion = async (interviewId, userId) => {
     else if (avgScore < 5) difficulty = "easy";
   }
 
-  const question = await generateQuestion({
+  const alreadyAsked = asked.map((item) => item.question?.trim().toLowerCase()).filter(Boolean);
+
+  let question = await generateQuestion({
     role: interview.role,
     topic: interview.topic,
     difficulty,
+    questionFormat: interview.questionFormat || "blend",
     askedQuestions: asked.map((item) => item.question),
     resumeContent: interview.resumeContent,
-    resumeData: interview.resumeData
+    resumeData: interview.resumeData,
+    questionIndex: interview.currentQuestionIndex,
+    totalQuestions: interview.totalQuestions
   });
+
+  // If AI generated a question that was already asked, regenerate once to prevent duplicate questions
+  if (question && alreadyAsked.includes(question.question?.trim().toLowerCase())) {
+    logger.warn("AI generated a duplicate question, regenerating with explicit prohibition", {
+      interviewId: String(interviewId),
+      duplicateQuestion: question.question
+    });
+    question = await generateQuestion({
+      role: interview.role,
+      topic: interview.topic,
+      difficulty,
+      questionFormat: interview.questionFormat || "blend",
+      askedQuestions: [...asked.map((item) => item.question), question.question],
+      resumeContent: interview.resumeContent,
+      resumeData: interview.resumeData,
+      questionIndex: interview.currentQuestionIndex,
+      totalQuestions: interview.totalQuestions
+    });
+  }
 
   const updatedInterview = await Interview.findOneAndUpdate(
     {
@@ -89,7 +118,14 @@ exports.nextQuestion = async (interviewId, userId) => {
     {
       $set: {
         currentQuestion: question.question,
-        currentQuestionId: question.questionId
+        currentQuestionId: question.questionId,
+        currentQuestionType: question.type || "conceptual",
+        currentQuestionOptions: question.options || [],
+        currentQuestionMeta: {
+          codeTemplate: question.codeTemplate || null,
+          language: question.language || null,
+          correctAnswers: question.correctAnswers || []
+        }
       }
     },
     { new: true }
@@ -102,6 +138,10 @@ exports.nextQuestion = async (interviewId, userId) => {
       return {
         questionId: latestInterview.currentQuestionId || `q_${Date.now()}`,
         question: latestInterview.currentQuestion,
+        type: latestInterview.currentQuestionType || "conceptual",
+        options: latestInterview.currentQuestionOptions || [],
+        codeTemplate: latestInterview.currentQuestionMeta?.codeTemplate || null,
+        language: latestInterview.currentQuestionMeta?.language || null,
         currentIndex: latestInterview.currentQuestionIndex + 1,
         totalQuestions: latestInterview.totalQuestions
       };
@@ -115,13 +155,18 @@ exports.nextQuestion = async (interviewId, userId) => {
   }
 
   return {
-    ...question,
+    questionId: updatedInterview.currentQuestionId,
+    question: updatedInterview.currentQuestion,
+    type: updatedInterview.currentQuestionType || "conceptual",
+    options: updatedInterview.currentQuestionOptions || [],
+    codeTemplate: updatedInterview.currentQuestionMeta?.codeTemplate || null,
+    language: updatedInterview.currentQuestionMeta?.language || null,
     currentIndex: updatedInterview.currentQuestionIndex + 1,
     totalQuestions: updatedInterview.totalQuestions
   };
 };
 
-exports.submitAnswer = async (interviewId, userId, answer) => {
+exports.submitAnswer = async (interviewId, userId, payload) => {
   const interview = await getOwnedInterview(interviewId, userId);
 
   if (isCompleted(interview.status)) {
@@ -133,12 +178,24 @@ exports.submitAnswer = async (interviewId, userId, answer) => {
     throw new BadRequestError("No active question found to answer");
   }
 
+  const questionType = interview.currentQuestionType || "conceptual";
+  const answerText = typeof payload === "object" ? (payload?.answer || "") : (payload || "");
+  const selectedOptions = typeof payload === "object" ? (payload?.selectedOptions || []) : [];
+  const code = typeof payload === "object" ? (payload?.code || "") : "";
+  const language = typeof payload === "object" ? (payload?.language || "javascript") : "javascript";
+  const correctAnswers = interview.currentQuestionMeta?.correctAnswers || [];
+
   let evaluation;
   try {
     evaluation = await evaluateAnswer({
       role: interview.role,
       question,
-      answer
+      answer: answerText,
+      questionType,
+      selectedOptions,
+      code,
+      language,
+      correctAnswers
     });
   } catch (err) {
     logger.error("Evaluation failed", {
@@ -154,8 +211,15 @@ exports.submitAnswer = async (interviewId, userId, answer) => {
   try {
     await InterviewAnswer.create({
       interviewId,
+      questionIndex: interview.currentQuestionIndex,
       question,
-      answer,
+      questionType,
+      answer: answerText,
+      selectedOptions,
+      codeAnswer: {
+        code: code || null,
+        language: language || null
+      },
       score: evaluation.score,
       strengths: evaluation.strengths,
       missing_points: evaluation.missing_points,
@@ -163,9 +227,33 @@ exports.submitAnswer = async (interviewId, userId, answer) => {
     });
   } catch (error) {
     if (error.code === 11000) {
-      throw new ConflictError("Answer already submitted for this question");
+      logger.warn("Answer record already exists for question, updating existing record", {
+        interviewId: String(interviewId),
+        question
+      });
+      await InterviewAnswer.findOneAndUpdate(
+        { interviewId, question },
+        {
+          $set: {
+            questionIndex: interview.currentQuestionIndex,
+            questionType,
+            answer: answerText,
+            selectedOptions,
+            codeAnswer: {
+              code: code || null,
+              language: language || null
+            },
+            score: evaluation.score,
+            strengths: evaluation.strengths,
+            missing_points: evaluation.missing_points,
+            ideal_answer: evaluation.ideal_answer,
+            isSkipped: false
+          }
+        }
+      );
+    } else {
+      throw error;
     }
-    throw error;
   }
 
   const nextQuestionIndex = interview.currentQuestionIndex + 1;
@@ -175,8 +263,6 @@ exports.submitAnswer = async (interviewId, userId, answer) => {
     {
       _id: interviewId,
       userId,
-      currentQuestion: question,
-      currentQuestionId: interview.currentQuestionId,
       status: { $ne: "Completed" }
     },
     {
@@ -187,7 +273,10 @@ exports.submitAnswer = async (interviewId, userId, answer) => {
       $set: {
         status: nextStatus,
         currentQuestion: null,
-        currentQuestionId: null
+        currentQuestionId: null,
+        currentQuestionType: "conceptual",
+        currentQuestionOptions: [],
+        currentQuestionMeta: null
       }
     },
     { new: true }
@@ -222,16 +311,34 @@ exports.skipQuestion = async (interviewId, userId) => {
   try {
     await InterviewAnswer.create({
       interviewId,
+      questionIndex: interview.currentQuestionIndex,
       question,
+      questionType: interview.currentQuestionType || "conceptual",
       answer: "SKIPPED",
       score: 0,
       isSkipped: true
     });
   } catch (error) {
     if (error.code === 11000) {
-      throw new ConflictError("Question already answered or skipped");
+      logger.warn("Question already recorded, updating to skipped", {
+        interviewId: String(interviewId),
+        question
+      });
+      await InterviewAnswer.findOneAndUpdate(
+        { interviewId, question },
+        {
+          $set: {
+            questionIndex: interview.currentQuestionIndex,
+            questionType: interview.currentQuestionType || "conceptual",
+            answer: "SKIPPED",
+            score: 0,
+            isSkipped: true
+          }
+        }
+      );
+    } else {
+      throw error;
     }
-    throw error;
   }
 
   const nextQuestionIndex = interview.currentQuestionIndex + 1;
@@ -241,8 +348,6 @@ exports.skipQuestion = async (interviewId, userId) => {
     {
       _id: interviewId,
       userId,
-      currentQuestion: question,
-      currentQuestionId: interview.currentQuestionId,
       status: { $ne: "Completed" }
     },
     {
@@ -252,7 +357,10 @@ exports.skipQuestion = async (interviewId, userId) => {
       $set: {
         status: nextStatus,
         currentQuestion: null,
-        currentQuestionId: null
+        currentQuestionId: null,
+        currentQuestionType: "conceptual",
+        currentQuestionOptions: [],
+        currentQuestionMeta: null
       }
     },
     { new: true }

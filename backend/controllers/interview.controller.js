@@ -26,7 +26,7 @@ const { structureResume } = require("../services/ai.service");
 exports.startInterviewController = [
   upload.single("resumeFile"),
   asyncHandler(async (req, res) => {
-    const { role, topic, totalQuestions, resumeText, templateId, difficulty } = req.body;
+    const { role, topic, totalQuestions, resumeText, templateId, difficulty, questionFormat } = req.body;
     if (!role) {
       throw new BadRequestError("role is required");
     }
@@ -91,6 +91,11 @@ exports.startInterviewController = [
       ? difficulty.toLowerCase()
       : "intermediate";
 
+    const ALLOWED_FORMATS = ["blend", "mcq", "coding", "conceptual"];
+    const sanitizedFormat = (typeof questionFormat === "string" && ALLOWED_FORMATS.includes(questionFormat.toLowerCase()))
+      ? questionFormat.toLowerCase()
+      : "blend";
+
     let interview;
     try {
       interview = await startInterview({
@@ -102,7 +107,8 @@ exports.startInterviewController = [
         resumeUrl,
         resumeData,
         templateId: templateId || null,
-        difficulty: sanitizedDifficulty
+        difficulty: sanitizedDifficulty,
+        questionFormat: sanitizedFormat
       });
     } catch (err) {
       // Rollback deducted credits if interview creation fails
@@ -132,12 +138,27 @@ exports.nextQuestionController = asyncHandler(async (req, res) => {
 });
 
 exports.submitAnswerController = asyncHandler(async (req, res) => {
-  const { interviewId, answer } = req.body;
-  if (!interviewId || !answer) {
-    throw new BadRequestError("interviewId and answer are required");
+  const { interviewId, answer, selectedOptions, code, language } = req.body;
+  if (!interviewId) {
+    throw new BadRequestError("interviewId is required");
   }
 
-  const evaluation = await submitAnswer(interviewId, req.user._id, answer);
+  const hasResponse = Boolean(
+    (typeof answer === "string" && answer.trim()) ||
+    (Array.isArray(selectedOptions) && selectedOptions.length > 0) ||
+    (typeof code === "string" && code.trim())
+  );
+
+  if (!hasResponse) {
+    throw new BadRequestError("An answer, option selection, or code submission is required");
+  }
+
+  const evaluation = await submitAnswer(interviewId, req.user._id, {
+    answer,
+    selectedOptions,
+    code,
+    language
+  });
   res.json(evaluation);
 });
 

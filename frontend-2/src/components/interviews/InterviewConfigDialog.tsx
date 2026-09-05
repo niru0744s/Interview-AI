@@ -6,10 +6,11 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription }
 import { cn } from "../../lib/utils";
 import { PREDEFINED_ROLES, TOPICS_MAPPING } from "../../utils/constants";
 import ResumeUpload from "./ResumeUpload";
-import { Target, FileText, ChevronLeft, Rocket, Briefcase, Zap, Gauge } from "lucide-react";
+import { Target, FileText, ChevronLeft, Rocket, Briefcase, Zap, Gauge, Sparkles, CheckSquare, Code2, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 
 export type DifficultyLevel = "beginner" | "intermediate" | "professional";
+export type QuestionFormat = "blend" | "mcq" | "coding" | "conceptual";
 
 interface InterviewConfigDialogProps {
     onCancel: () => void;
@@ -18,6 +19,7 @@ interface InterviewConfigDialogProps {
         topic: string;
         totalQuestions: number;
         difficulty: DifficultyLevel;
+        questionFormat: QuestionFormat;
         resumeFile: File | null;
         resumeText: string;
     }) => void;
@@ -33,6 +35,7 @@ export default function InterviewConfigDialog({ onCancel, onLaunch, isCreating }
     const [selectedTopic, setSelectedTopic] = useState<string>(TOPICS_MAPPING[PREDEFINED_ROLES[0]][0]);
     const [customTopic, setCustomTopic] = useState<string>("");
     const [difficulty, setDifficulty] = useState<DifficultyLevel>("intermediate");
+    const [questionFormat, setQuestionFormat] = useState<QuestionFormat>("blend");
     const [totalQuestions, setTotalQuestions] = useState<number>(10);
     const [resumeData, setResumeData] = useState<{ file: File | null; text: string }>({ file: null, text: "" });
 
@@ -64,6 +67,7 @@ export default function InterviewConfigDialog({ onCancel, onLaunch, isCreating }
             topic: finalTopic,
             totalQuestions,
             difficulty,
+            questionFormat,
             resumeFile: resumeData.file,
             resumeText: resumeData.text
         });
@@ -206,6 +210,43 @@ export default function InterviewConfigDialog({ onCancel, onLaunch, isCreating }
                             </span>
                         </Button>
                     ))}
+                </div>
+            </div>
+
+            <div className="space-y-3">
+                <Label className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground/60 flex items-center gap-2">
+                    <Sparkles className="h-3 w-3 text-primary" /> Question Style & Format
+                </Label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[
+                        { id: "blend" as const, label: "AI Blend", desc: "MCQ + Code + Theory", icon: Sparkles },
+                        { id: "mcq" as const, label: "MCQ Focus", desc: "Multiple Choice Quiz", icon: CheckSquare },
+                        { id: "coding" as const, label: "Coding Focus", desc: "Live Hands-On Tasks", icon: Code2 },
+                        { id: "conceptual" as const, label: "Conceptual", desc: "Deep Theory & Arch", icon: MessageSquare }
+                    ].map((fmt) => {
+                        const Icon = fmt.icon;
+                        return (
+                            <Button
+                                key={fmt.id}
+                                type="button"
+                                variant={questionFormat === fmt.id ? "default" : "outline"}
+                                className={cn(
+                                    "h-auto py-3 px-2 flex flex-col items-center justify-center gap-1.5 text-xs font-bold transition-all rounded-xl border-white/10 text-center",
+                                    questionFormat === fmt.id && "btn-premium text-white border-transparent"
+                                )}
+                                onClick={() => setQuestionFormat(fmt.id)}
+                            >
+                                <Icon className={cn("h-4 w-4", questionFormat === fmt.id ? "text-white" : "text-primary")} />
+                                <span className="font-black uppercase tracking-wider text-[11px]">{fmt.label}</span>
+                                <span className={cn(
+                                    "text-[9px] font-medium leading-tight opacity-75 line-clamp-1",
+                                    questionFormat === fmt.id ? "text-white/90" : "text-muted-foreground"
+                                )}>
+                                    {fmt.desc}
+                                </span>
+                            </Button>
+                        );
+                    })}
                 </div>
             </div>
 

@@ -77,70 +77,178 @@ Return ONLY valid JSON in this exact format. If a field is missing, return an em
 };
 
 /**
- * Generate one interview question
+ * Generate one interview question with structured format (conceptual, mcq, or code)
  */
-exports.generateQuestion = async ({ role, topic, difficulty, askedQuestions, resumeContent, resumeData }) => {
+exports.generateQuestion = async ({
+  role,
+  topic,
+  difficulty,
+  questionFormat = "blend",
+  askedQuestions = [],
+  resumeContent,
+  resumeData,
+  questionIndex = 0,
+  totalQuestions = 10
+}) => {
+  // Determine target question type based on questionFormat and position
+  let targetType = "conceptual";
+  if (questionFormat === "mcq") {
+    targetType = "mcq";
+  } else if (questionFormat === "coding") {
+    targetType = "code";
+  } else if (questionFormat === "conceptual") {
+    targetType = "conceptual";
+  } else {
+    // Dynamic Blend strategy:
+    // Start with MCQ warm-ups, transition to code, balance with conceptual
+    if (totalQuestions <= 5) {
+      if (questionIndex === 0) targetType = "mcq";
+      else if (questionIndex === 2) targetType = "code";
+      else targetType = "conceptual";
+    } else {
+      if (questionIndex < 2) {
+        targetType = "mcq";
+      } else if (
+        questionIndex >= Math.floor(totalQuestions * 0.4) &&
+        questionIndex < Math.floor(totalQuestions * 0.4) + 2
+      ) {
+        targetType = "code";
+      } else {
+        targetType = "conceptual";
+      }
+    }
+  }
+
   let systemPrompt = `
-You are a strict technical interviewer for a ${role} role.
-The specific focus/topic for this part of the interview is: ${topic}.
+You are a senior technical interviewer conducting an interview for a ${role} position.
+Specific topic: ${topic}.
+Difficulty: ${difficulty}.
+Target Question Type: ${targetType.toUpperCase()}.
+
+You must output ONLY valid JSON in this exact structure:
+{
+  "type": "${targetType}",
+  "question": "Question statement or coding problem description",
+  "options": ["Option A", "Option B", "Option C", "Option D"],
+  "correctAnswers": ["Option A"],
+  "codeTemplate": "// Starter code / component or function template",
+  "language": "javascript"
+}
+
+Specific rules per type:
+1. If type is "mcq":
+   - "question" must be a concise, realistic multiple-choice technical question.
+   - "options" MUST contain exactly 4 distinct, plausible technical options.
+   - "correctAnswers" MUST contain exactly 1 correct option matching one of the items in "options".
+   - "codeTemplate" must be null.
+   - "language" must be null.
+
+2. If type is "code":
+   - "question" must clearly describe a practical coding challenge relevant to ${role} (e.g. React component/hook, Express route/middleware, database query, or utility algorithm). Include inputs, expected output, and edge cases.
+   - "options" must be [].
+   - "correctAnswers" must be [].
+   - "codeTemplate" MUST provide clean starter code / function signature / component shell with TODO comments.
+   - "language" should be "javascript" or "typescript".
+
+3. If type is "conceptual":
+   - "question" must test technical depth, trade-offs, architecture, or internal mechanics.
+   - "options" must be [].
+   - "correctAnswers" must be [].
+   - "codeTemplate" must be null.
+   - "language" must be null.
 `;
 
   if (resumeData && typeof resumeData === 'object' && Object.keys(resumeData).length > 0) {
     systemPrompt += `
-The candidate's structured resume data is provided below. 
-You must ask ONE SHORT AND DIRECT technical question based on their actual experience.
-Do this by picking ONE skill and ONE project from the data.
-
-RESUME DATA:
+Candidate's structured resume data:
 ${JSON.stringify(resumeData, null, 2)}
+Where possible, tailor the question to their background or tech stack.
 `;
   } else if (resumeContent) {
     systemPrompt += `
-I have provided the candidate's raw resume/experience below. 
-Use this context to tailor your questions to their actual background, projects, and skills where possible. 
-
-RESUME CONTEXT:
+Candidate's resume context:
 ${resumeContent}
 `;
   }
 
   systemPrompt += `
-Rules:
-- Ask exactly ONE direct question.
-- Do NOT ask multi-part questions (e.g., avoid "1. ..., 2. ..., 3. ...").
-- Keep your question under 3 sentences.
-- Focus strictly on ${topic}.
-- No explanations or hints.
-- Do not repeat previous questions.
-- Difficulty: ${difficulty}
+General Rules:
+- Ask exactly ONE question.
+- Do NOT repeat previous questions.
+- Return strictly valid JSON with no markdown wrapping or outer text.
 `;
 
   const userPrompt = `
 Previously asked questions:
-${askedQuestions.join("\n")}
+${askedQuestions.length > 0 ? askedQuestions.join("\n") : "None (this is the first question)"}
 
-Ask the next question.
+Generate question #${questionIndex + 1} of ${totalQuestions} in ${targetType} format.
 `;
 
-  const client = getAIClient();
-  const response = await client.chat.completions.create({
-    model: "openai/gpt-oss-20b",
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt }
-    ],
-    temperature: 0.4
-  });
+  try {
+    const client = getAIClient();
+    const response = await client.chat.completions.create({
+      model: "openai/gpt-oss-20b",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ],
+      temperature: 0.3,
+      response_format: { type: "json_object" }
+    });
 
-  return {
-    questionId: `q_${Date.now()}`,
-    question: response.choices[0].message.content.trim()
-  };
-}
+    const rawContent = response.choices[0].message.content.trim();
+    const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error("No JSON found in question generator response");
+    }
 
-exports.evaluateAnswer = async ({ role, question, answer }) => {
+    const parsed = JSON.parse(jsonMatch[0]);
+
+    const validatedType = ["conceptual", "mcq", "multi_choice", "code"].includes(parsed.type)
+      ? parsed.type
+      : targetType;
+
+    return {
+      questionId: `q_${Date.now()}`,
+      type: validatedType,
+      question: parsed.question || "Describe your approach to building reliable software applications.",
+      options: Array.isArray(parsed.options) ? parsed.options : [],
+      correctAnswers: Array.isArray(parsed.correctAnswers) ? parsed.correctAnswers : [],
+      codeTemplate: parsed.codeTemplate || (validatedType === "code" ? "// Write your implementation here\n" : null),
+      language: parsed.language || (validatedType === "code" ? "javascript" : null)
+    };
+  } catch (err) {
+    logger.error("Failed to generate structured question", { message: err.message, stack: err.stack });
+    // Safe fallback to conceptual question if JSON generation fails
+    return {
+      questionId: `q_${Date.now()}`,
+      type: "conceptual",
+      question: `Could you explain key architectural principles and best practices for ${topic} in a ${role} role?`,
+      options: [],
+      correctAnswers: [],
+      codeTemplate: null,
+      language: null
+    };
+  }
+};
+
+exports.evaluateAnswer = async ({
+  role,
+  question,
+  answer,
+  questionType = "conceptual",
+  selectedOptions = [],
+  code = "",
+  language = "javascript",
+  correctAnswers = []
+}) => {
+  const answerPayload = (questionType === "mcq" || questionType === "multi_choice")
+    ? (Array.isArray(selectedOptions) ? selectedOptions.join(", ") : String(selectedOptions || ""))
+    : (questionType === "code" ? (code || answer || "") : (answer || ""));
+
   const cacheKey = crypto.createHash('sha256')
-    .update(`eval_${role}_${question}_${answer}`)
+    .update(`eval_${role}_${question}_${questionType}_${answerPayload}`)
     .digest('hex');
 
   // Check Cache
@@ -150,6 +258,106 @@ exports.evaluateAnswer = async ({ role, question, answer }) => {
     return cached.value;
   }
 
+  // 1. MCQ & Multi-Choice Evaluation: Deterministic grading
+  if (questionType === "mcq" || questionType === "multi_choice") {
+    const selected = Array.isArray(selectedOptions) ? selectedOptions : [selectedOptions].filter(Boolean);
+    const correct = Array.isArray(correctAnswers) ? correctAnswers : [correctAnswers].filter(Boolean);
+
+    const isMatch = selected.length > 0 && correct.some(c =>
+      selected.some(s => s && s.trim().toLowerCase() === c.trim().toLowerCase())
+    );
+
+    const score = isMatch ? 10 : 0;
+    const strengths = isMatch ? ["Selected the correct answer accurately."] : [];
+    const missing_points = isMatch ? [] : [`Selected "${selected[0] || 'none'}" instead of the correct answer.`];
+    const ideal_answer = correct[0] || "Correct option";
+
+    const result = {
+      score,
+      strengths,
+      missing_points,
+      ideal_answer
+    };
+
+    await AICache.create({
+      key: cacheKey,
+      value: result,
+      type: 'evaluation'
+    }).catch(err => logger.error("Cache write error", { message: err.message }));
+
+    return result;
+  }
+
+  // 2. Code Evaluation: Review code implementation without sandbox runner
+  if (questionType === "code") {
+    const systemPrompt = `
+You are a senior technical interviewer reviewing a candidate's code submission for a ${role} interview.
+Review the candidate's implementation for: ${question}
+
+Evaluate based on:
+1. Logic & Functional Correctness (does it solve the problem, handle React state/hooks or backend routes properly)
+2. Architecture, Clean Code & Best Practices
+3. Handling of Edge Cases & Error Boundaries
+4. Performance & Complexity
+
+Rules:
+- Be strict, objective, and realistic.
+- Return ONLY valid JSON in this exact format:
+{
+  "score": number (0-10),
+  "strengths": string[],
+  "missing_points": string[],
+  "ideal_answer": string
+}
+`;
+
+    const userPrompt = `
+Problem: ${question}
+Candidate Code Submission (${language || "javascript"}):
+\`\`\`${language || "javascript"}
+${code || answer}
+\`\`\`
+Candidate Additional Notes: ${answer || "None"}
+`;
+
+    try {
+      const client = getAIClient();
+      const response = await client.chat.completions.create({
+        model: "openai/gpt-oss-20b",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        temperature: 0.2,
+        response_format: { type: "json_object" }
+      });
+
+      const content = response.choices[0].message.content;
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error("AI failed to return code evaluation JSON");
+      }
+
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (parsed.ideal_answer === undefined) parsed.ideal_answer = "Clean implementation covering core logic and edge cases.";
+      if (!Array.isArray(parsed.strengths)) parsed.strengths = [];
+      if (!Array.isArray(parsed.missing_points)) parsed.missing_points = [];
+      if (typeof parsed.score !== "number") parsed.score = Number(parsed.score) || 0;
+
+      await AICache.create({
+        key: cacheKey,
+        value: parsed,
+        type: 'evaluation'
+      }).catch(err => logger.error("Cache write error", { message: err.message }));
+
+      return parsed;
+    } catch (err) {
+      logger.error("AI code evaluation failed", { message: err.message, stack: err.stack });
+      throw new Error("AI evaluation failed. Please retry.");
+    }
+  }
+
+  // 3. Conceptual Evaluation (Default)
   const systemPrompt = `
 You are a strict technical interviewer evaluating a candidate.
 

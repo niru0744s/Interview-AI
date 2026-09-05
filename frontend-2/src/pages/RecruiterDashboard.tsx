@@ -50,7 +50,8 @@ export default function RecruiterDashboard() {
         topic: "",
         description: "",
         totalQuestions: 10,
-        difficulty: "intermediate"
+        difficulty: "intermediate",
+        questionFormat: "blend"
     });
 
     useEffect(() => {
@@ -89,7 +90,7 @@ export default function RecruiterDashboard() {
             // Refresh stats since activePosts increased
             fetchStats();
             setIsModalOpen(false);
-            setFormData({ title: "", role: "", topic: "", description: "", totalQuestions: 10, difficulty: "intermediate" });
+            setFormData({ title: "", role: "", topic: "", description: "", totalQuestions: 10, difficulty: "intermediate", questionFormat: "blend" });
             toast.success("Job Template created successfully!");
         } catch {
             toast.error("Failed to create job template");
@@ -349,6 +350,19 @@ export default function RecruiterDashboard() {
                                                 required
                                             />
                                         </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Question Style & Format</label>
+                                        <select
+                                            value={formData.questionFormat}
+                                            onChange={(e) => setFormData({ ...formData, questionFormat: e.target.value })}
+                                            className="w-full h-14 px-4 rounded-2xl bg-white/5 border border-white/10 font-medium focus:ring-2 ring-primary/20 outline-none transition-all appearance-none text-sm"
+                                        >
+                                            <option value="blend">🌟 Dynamic AI Blend (MCQs + Code + Theory)</option>
+                                            <option value="mcq">📝 MCQ Focused (Multiple-Choice Quizzes)</option>
+                                            <option value="coding">💻 Coding Focused (Hands-on Programming)</option>
+                                            <option value="conceptual">💬 Conceptual (Deep Architecture & Theory)</option>
+                                        </select>
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Description (Optional)</label>

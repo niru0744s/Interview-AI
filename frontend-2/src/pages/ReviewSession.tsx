@@ -4,17 +4,7 @@ import { Button } from "../components/ui/button";
 import api from "../lib/axios";
 import { Loader2, ChevronLeft } from "lucide-react";
 import ReviewSummaryHeader from "../components/review/ReviewSummaryHeader";
-import ReviewAnswerCard from "../components/review/ReviewAnswerCard";
-
-type Answer = {
-    _id: string;
-    question: string;
-    answer: string;
-    score: number;
-    strengths: string[];
-    missing_points: string[];
-    ideal_answer: string;
-};
+import ReviewAnswerCard, { ReviewAnswer } from "../components/review/ReviewAnswerCard";
 
 type InterviewData = {
     interview: {
@@ -25,7 +15,7 @@ type InterviewData = {
         totalQuestions: number;
         createdAt: string;
     };
-    answers: Answer[];
+    answers: ReviewAnswer[];
     summary?: {
         score: number;
         feedback: string;

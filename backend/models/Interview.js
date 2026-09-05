@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+
 const newSchema = mongoose.Schema({
     userId: {
         type: mongoose.Schema.Types.ObjectId,
@@ -26,6 +27,11 @@ const newSchema = mongoose.Schema({
         type: String,
         enum: ["beginner", "intermediate", "professional"],
         default: "intermediate"
+    },
+    questionFormat: {
+        type: String,
+        enum: ["blend", "mcq", "coding", "conceptual"],
+        default: "blend"
     },
     status: {
         type: String,
@@ -55,6 +61,19 @@ const newSchema = mongoose.Schema({
     },
     currentQuestionId: {
         type: String,
+        default: null
+    },
+    currentQuestionType: {
+        type: String,
+        enum: ["conceptual", "mcq", "multi_choice", "code"],
+        default: "conceptual"
+    },
+    currentQuestionOptions: {
+        type: [String],
+        default: []
+    },
+    currentQuestionMeta: {
+        type: mongoose.Schema.Types.Mixed,
         default: null
     },
     summaryGenerated: {
