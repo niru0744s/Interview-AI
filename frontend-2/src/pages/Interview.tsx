@@ -27,6 +27,7 @@ type InterviewDetails = {
   role: string;
   topic: string;
   totalQuestions: number;
+  category?: "technical" | "behavioral";
 };
 
 export default function Interview() {
@@ -58,6 +59,7 @@ export default function Interview() {
         role: res.data.role,
         topic: res.data.topic,
         totalQuestions: res.data.totalQuestions,
+        category: res.data.category,
       });
     } catch (err) {
       console.error("Failed to fetch interview details", err);
@@ -255,6 +257,7 @@ export default function Interview() {
         currentIndex={question?.currentIndex}
         totalQuestions={question?.totalQuestions || details?.totalQuestions}
         status={status}
+        category={details?.category}
       />
 
       <InterviewLiveArea

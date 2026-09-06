@@ -26,7 +26,7 @@ const { structureResume } = require("../services/ai.service");
 exports.startInterviewController = [
   upload.single("resumeFile"),
   asyncHandler(async (req, res) => {
-    const { role, topic, totalQuestions, resumeText, templateId, difficulty, questionFormat } = req.body;
+    const { role, topic, totalQuestions, resumeText, templateId, difficulty, questionFormat, category } = req.body;
     if (!role) {
       throw new BadRequestError("role is required");
     }
@@ -96,6 +96,11 @@ exports.startInterviewController = [
       ? questionFormat.toLowerCase()
       : "blend";
 
+    const ALLOWED_CATEGORIES = ["technical", "behavioral"];
+    const sanitizedCategory = (typeof category === "string" && ALLOWED_CATEGORIES.includes(category.toLowerCase()))
+      ? category.toLowerCase()
+      : "technical";
+
     let interview;
     try {
       interview = await startInterview({
@@ -108,7 +113,8 @@ exports.startInterviewController = [
         resumeData,
         templateId: templateId || null,
         difficulty: sanitizedDifficulty,
-        questionFormat: sanitizedFormat
+        questionFormat: sanitizedFormat,
+        category: sanitizedCategory
       });
     } catch (err) {
       // Rollback deducted credits if interview creation fails
@@ -236,6 +242,8 @@ exports.generateInterviewSummaryController = asyncHandler(async (req, res) => {
     totalQuestions: interview.totalQuestions,
     answers,
     status: interview.status,
+    role: interview.role,
+    topic: interview.topic,
     quitReason: interview.endedReason || null,
     startedAt: interview.createdAt,
     endedAt: interview.updatedAt

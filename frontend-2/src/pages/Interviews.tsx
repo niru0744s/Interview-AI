@@ -25,6 +25,7 @@ export default function Interviews() {
     totalQuestions: number;
     difficulty?: string;
     questionFormat?: string;
+    category?: string;
     resumeFile: File | null;
     resumeText: string;
   }) => {
@@ -53,6 +54,9 @@ export default function Interviews() {
       }
       if (payload.questionFormat) {
         formData.append("questionFormat", payload.questionFormat);
+      }
+      if (payload.category) {
+        formData.append("category", payload.category);
       }
 
       if (payload.resumeFile) {

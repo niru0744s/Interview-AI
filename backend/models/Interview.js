@@ -33,6 +33,11 @@ const newSchema = mongoose.Schema({
         enum: ["blend", "mcq", "coding", "conceptual"],
         default: "blend"
     },
+    category: {
+        type: String,
+        enum: ["technical", "behavioral"],
+        default: "technical"
+    },
     status: {
         type: String,
         enum: ["in_progress", "quit", "Completed"],

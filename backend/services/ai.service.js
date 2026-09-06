@@ -84,79 +84,184 @@ exports.generateQuestion = async ({
   topic,
   difficulty,
   questionFormat = "blend",
+  category = "technical",
   askedQuestions = [],
   resumeContent,
   resumeData,
   questionIndex = 0,
   totalQuestions = 10
 }) => {
-  // Determine target question type based on questionFormat and position
+  const isBehavioral = category === "behavioral";
+
+  // Determine target question type based on category, questionFormat, and position
   let targetType = "conceptual";
-  if (questionFormat === "mcq") {
-    targetType = "mcq";
-  } else if (questionFormat === "coding") {
-    targetType = "code";
-  } else if (questionFormat === "conceptual") {
-    targetType = "conceptual";
-  } else {
-    // Dynamic Blend strategy:
-    // Start with MCQ warm-ups, transition to code, balance with conceptual
-    if (totalQuestions <= 5) {
-      if (questionIndex === 0) targetType = "mcq";
-      else if (questionIndex === 2) targetType = "code";
-      else targetType = "conceptual";
+  if (isBehavioral) {
+    if (questionFormat === "mcq") {
+      targetType = "mcq";
+    } else if (questionFormat === "conceptual") {
+      targetType = "conceptual";
     } else {
-      if (questionIndex < 2) {
+      // Behavioral Blend: situational judgment MCQ warm-up, then rich STAR behavioral scenarios
+      if (questionIndex === 0 || (totalQuestions > 5 && questionIndex === 1)) {
         targetType = "mcq";
-      } else if (
-        questionIndex >= Math.floor(totalQuestions * 0.4) &&
-        questionIndex < Math.floor(totalQuestions * 0.4) + 2
-      ) {
-        targetType = "code";
       } else {
         targetType = "conceptual";
       }
     }
+  } else {
+    // Technical track
+    if (questionFormat === "mcq") {
+      targetType = "mcq";
+    } else if (questionFormat === "coding") {
+      targetType = "code";
+    } else if (questionFormat === "conceptual") {
+      targetType = "conceptual";
+    } else {
+      // Dynamic Blend strategy for technical:
+      // Start with MCQ warm-ups, transition to code, balance with conceptual
+      if (totalQuestions <= 5) {
+        if (questionIndex === 0) targetType = "mcq";
+        else if (questionIndex === 2) targetType = "code";
+        else targetType = "conceptual";
+      } else {
+        if (questionIndex < 2) {
+          targetType = "mcq";
+        } else if (
+          questionIndex >= Math.floor(totalQuestions * 0.4) &&
+          questionIndex < Math.floor(totalQuestions * 0.4) + 2
+        ) {
+          targetType = "code";
+        } else {
+          targetType = "conceptual";
+        }
+      }
+    }
   }
 
-  let systemPrompt = `
-You are a senior technical interviewer conducting an interview for a ${role} position.
-Specific topic: ${topic}.
-Difficulty: ${difficulty}.
-Target Question Type: ${targetType.toUpperCase()}.
-
+  let systemPrompt;
+  if (isBehavioral) {
+    let typeSpecificRules = "";
+    if (targetType === "mcq") {
+      typeSpecificRules = `
 You must output ONLY valid JSON in this exact structure:
 {
-  "type": "${targetType}",
-  "question": "Question statement or coding problem description",
+  "type": "mcq",
+  "question": "Workplace situational judgment scenario",
   "options": ["Option A", "Option B", "Option C", "Option D"],
   "correctAnswers": ["Option A"],
-  "codeTemplate": "// Starter code / component or function template",
+  "codeTemplate": null,
+  "language": null
+}
+
+Rules:
+- "question" must present a realistic workplace situational judgment scenario (e.g. cross-team disagreement, critical project delay, ethical dilemma, managing difficult stakeholders).
+- "options" MUST contain exactly 4 distinct, plausible workplace actions.
+- "correctAnswers" MUST contain exactly 1 most professional, constructive action matching an item in "options".
+- "codeTemplate" must be null.
+- "language" must be null.
+`;
+    } else {
+      // conceptual
+      typeSpecificRules = `
+You must output ONLY valid JSON in this exact structure:
+{
+  "type": "conceptual",
+  "question": "Open-ended behavioral scenario (STAR method)",
+  "options": [],
+  "correctAnswers": [],
+  "codeTemplate": null,
+  "language": null
+}
+
+Rules:
+- "question" must be an open-ended behavioral scenario (prompting the candidate to use the STAR method: Situation, Task, Action, Result) regarding teamwork, communication, handling failure, conflict, or high-pressure situations.
+- Strictly NO coding or technical syntax requests.
+- "options" must be [].
+- "correctAnswers" must be [].
+- "codeTemplate" must be null.
+- "language" must be null.
+`;
+    }
+
+    systemPrompt = `
+You are an Executive HR Director and Leadership Talent Partner conducting a professional Behavioral & Culture Fit interview for a ${role} position.
+Specific Focus Area: ${topic}.
+Seniority / Depth Level: ${difficulty}.
+Required Format: ONLY ${targetType.toUpperCase()}.
+${typeSpecificRules}
+`;
+  } else {
+    // Technical track
+    let typeSpecificRules = "";
+    if (targetType === "mcq") {
+      typeSpecificRules = `
+You must output ONLY valid JSON in this exact structure:
+{
+  "type": "mcq",
+  "question": "Concise, realistic multiple-choice technical question",
+  "options": ["Option A", "Option B", "Option C", "Option D"],
+  "correctAnswers": ["Option A"],
+  "codeTemplate": null,
+  "language": null
+}
+
+Rules:
+- "question" must be a concise, realistic multiple-choice technical question testing ${topic}.
+- "options" MUST contain exactly 4 distinct, plausible technical options.
+- "correctAnswers" MUST contain exactly 1 correct option matching one of the items in "options".
+- "codeTemplate" must be null.
+- "language" must be null.
+`;
+    } else if (targetType === "code") {
+      typeSpecificRules = `
+You must output ONLY valid JSON in this exact structure:
+{
+  "type": "code",
+  "question": "Detailed coding challenge description with problem requirements, inputs, expected output, and edge cases",
+  "options": [],
+  "correctAnswers": [],
+  "codeTemplate": "// Starter code / function template\\nfunction solution() {\\n  // TODO\\n}",
   "language": "javascript"
 }
 
-Specific rules per type:
-1. If type is "mcq":
-   - "question" must be a concise, realistic multiple-choice technical question.
-   - "options" MUST contain exactly 4 distinct, plausible technical options.
-   - "correctAnswers" MUST contain exactly 1 correct option matching one of the items in "options".
-   - "codeTemplate" must be null.
-   - "language" must be null.
-
-2. If type is "code":
-   - "question" must clearly describe a practical coding challenge relevant to ${role} (e.g. React component/hook, Express route/middleware, database query, or utility algorithm). Include inputs, expected output, and edge cases.
-   - "options" must be [].
-   - "correctAnswers" must be [].
-   - "codeTemplate" MUST provide clean starter code / function signature / component shell with TODO comments.
-   - "language" should be "javascript" or "typescript".
-
-3. If type is "conceptual":
-   - "question" must test technical depth, trade-offs, architecture, or internal mechanics.
-   - "options" must be [].
-   - "correctAnswers" must be [].
-   - "codeTemplate" must be null.
-   - "language" must be null.
+Rules:
+- "question" must clearly describe a practical coding challenge relevant to ${role} and ${topic} (e.g. React component/hook, Express route/middleware, database query, or utility algorithm). Include inputs, expected output, and edge cases.
+- "options" must be [].
+- "correctAnswers" must be [].
+- "codeTemplate" MUST provide clean starter code / function signature / component shell with TODO comments.
+- "language" should be "javascript" or "typescript".
 `;
+    } else {
+      // conceptual
+      typeSpecificRules = `
+You must output ONLY valid JSON in this exact structure:
+{
+  "type": "conceptual",
+  "question": "In-depth technical conceptual / architectural question",
+  "options": [],
+  "correctAnswers": [],
+  "codeTemplate": null,
+  "language": null
+}
+
+Rules:
+- "question" must test technical depth, trade-offs, architecture, or internal mechanics of ${topic}.
+- Strictly NO multiple-choice options or code editor prompts.
+- "options" must be [].
+- "correctAnswers" must be [].
+- "codeTemplate" must be null.
+- "language" must be null.
+`;
+    }
+
+    systemPrompt = `
+You are a senior technical interviewer conducting an interview for a ${role} position.
+Specific topic: ${topic}.
+Difficulty: ${difficulty}.
+Required Format: ONLY ${targetType.toUpperCase()}.
+${typeSpecificRules}
+`;
+  }
 
   if (resumeData && typeof resumeData === 'object' && Object.keys(resumeData).length > 0) {
     systemPrompt += `
@@ -173,7 +278,7 @@ ${resumeContent}
 
   systemPrompt += `
 General Rules:
-- Ask exactly ONE question.
+- Ask exactly ONE question in ${targetType.toUpperCase()} format.
 - Do NOT repeat previous questions.
 - Return strictly valid JSON with no markdown wrapping or outer text.
 `;
@@ -182,7 +287,7 @@ General Rules:
 Previously asked questions:
 ${askedQuestions.length > 0 ? askedQuestions.join("\n") : "None (this is the first question)"}
 
-Generate question #${questionIndex + 1} of ${totalQuestions} in ${targetType} format.
+Generate question #${questionIndex + 1} of ${totalQuestions} strictly in ${targetType} format.
 `;
 
   try {
@@ -205,26 +310,105 @@ Generate question #${questionIndex + 1} of ${totalQuestions} in ${targetType} fo
 
     const parsed = JSON.parse(jsonMatch[0]);
 
-    const validatedType = ["conceptual", "mcq", "multi_choice", "code"].includes(parsed.type)
-      ? parsed.type
-      : targetType;
+    // Strictly enforce the targetType so model drift cannot alter the user's requested format
+    const validatedType = targetType;
+
+    let options = Array.isArray(parsed.options) ? parsed.options : [];
+    let correctAnswers = Array.isArray(parsed.correctAnswers) ? parsed.correctAnswers : [];
+    let codeTemplate = parsed.codeTemplate || null;
+    let language = parsed.language || null;
+
+    if (validatedType === "mcq") {
+      if (options.length < 2) {
+        options = [
+          `Properly configure and apply ${topic} patterns`,
+          `Optimize performance using asynchronous patterns`,
+          `Implement automated testing and validation`,
+          `Separate architectural boundaries into modular layers`
+        ];
+        correctAnswers = [options[0]];
+      }
+      codeTemplate = null;
+      language = null;
+    } else if (validatedType === "code") {
+      options = [];
+      correctAnswers = [];
+      if (!codeTemplate) {
+        codeTemplate = `// Problem: ${parsed.question || topic}\n// Implement your solution below\n\nfunction solution() {\n  // TODO\n}\n`;
+      }
+      if (!language) {
+        language = "javascript";
+      }
+    } else {
+      // conceptual
+      options = [];
+      correctAnswers = [];
+      codeTemplate = null;
+      language = null;
+    }
 
     return {
       questionId: `q_${Date.now()}`,
       type: validatedType,
-      question: parsed.question || "Describe your approach to building reliable software applications.",
-      options: Array.isArray(parsed.options) ? parsed.options : [],
-      correctAnswers: Array.isArray(parsed.correctAnswers) ? parsed.correctAnswers : [],
-      codeTemplate: parsed.codeTemplate || (validatedType === "code" ? "// Write your implementation here\n" : null),
-      language: parsed.language || (validatedType === "code" ? "javascript" : null)
+      question: parsed.question || (validatedType === "code"
+        ? `Implement a robust function handling ${topic} for a ${role} application.`
+        : `Could you explain key architectural principles and best practices for ${topic} in a ${role} role?`),
+      options,
+      correctAnswers,
+      codeTemplate,
+      language
     };
   } catch (err) {
     logger.error("Failed to generate structured question", { message: err.message, stack: err.stack });
-    // Safe fallback to conceptual question if JSON generation fails
+
+    // Type-aware fallback ensures the question format always respects targetType
+    if (targetType === "mcq") {
+      const fallbackOptions = isBehavioral
+        ? [
+            "Actively listen to team members and organize a structured alignment meeting.",
+            "Escalate immediately to senior leadership without consulting peers.",
+            "Proceed with the initial plan regardless of team feedback.",
+            "Postpone all related deliverables until consensus emerges naturally."
+          ]
+        : [
+            `Utilize modular design and clear abstractions for ${topic}.`,
+            `Bypass standard validation to maximize throughput.`,
+            `Hardcode values directly into the runtime environment.`,
+            `Disable error logging to conserve memory.`
+          ];
+
+      return {
+        questionId: `q_${Date.now()}`,
+        type: "mcq",
+        question: isBehavioral
+          ? `When encountering unexpected stakeholder disagreements regarding ${topic}, which course of action is most effective?`
+          : `Which of the following represents the industry best practice when designing ${topic} solutions for a ${role}?`,
+        options: fallbackOptions,
+        correctAnswers: [fallbackOptions[0]],
+        codeTemplate: null,
+        language: null
+      };
+    }
+
+    if (targetType === "code") {
+      return {
+        questionId: `q_${Date.now()}`,
+        type: "code",
+        question: `Write an efficient function or module in JavaScript/TypeScript demonstrating proper implementation of ${topic} for a ${role} system. Handle edge cases and optimize for maintainability.`,
+        options: [],
+        correctAnswers: [],
+        codeTemplate: `/**\n * Solution for ${topic}\n * Role: ${role}\n */\nfunction solution(input) {\n  // Write your implementation here\n}\n\nmodule.exports = { solution };\n`,
+        language: "javascript"
+      };
+    }
+
+    // Default conceptual fallback
     return {
       questionId: `q_${Date.now()}`,
       type: "conceptual",
-      question: `Could you explain key architectural principles and best practices for ${topic} in a ${role} role?`,
+      question: isBehavioral
+        ? `Describe a challenging situation in your career involving ${topic}. How did you assess the problem, what actions did you take, and what was the outcome?`
+        : `Could you explain key architectural principles and best practices for ${topic} in a ${role} role?`,
       options: [],
       correctAnswers: [],
       codeTemplate: null,
@@ -238,6 +422,7 @@ exports.evaluateAnswer = async ({
   question,
   answer,
   questionType = "conceptual",
+  category = "technical",
   selectedOptions = [],
   code = "",
   language = "javascript",
@@ -248,7 +433,7 @@ exports.evaluateAnswer = async ({
     : (questionType === "code" ? (code || answer || "") : (answer || ""));
 
   const cacheKey = crypto.createHash('sha256')
-    .update(`eval_${role}_${question}_${questionType}_${answerPayload}`)
+    .update(`eval_${category}_${role}_${question}_${questionType}_${answerPayload}`)
     .digest('hex');
 
   // Check Cache
@@ -357,8 +542,31 @@ Candidate Additional Notes: ${answer || "None"}
     }
   }
 
-  // 3. Conceptual Evaluation (Default)
-  const systemPrompt = `
+  // 3. Conceptual / Behavioral Evaluation
+  let systemPrompt;
+  if (category === "behavioral") {
+    systemPrompt = `
+You are an Executive HR & Talent Director evaluating a candidate's behavioral interview response for a ${role} position.
+
+Evaluate based on:
+1. STAR Framework completeness (Situation, Task, Action taken, measurable/clear Result)
+2. Professional maturity, accountability, and empathy
+3. Conflict resolution, stakeholder management, and team collaboration
+4. Clarity, structure, and communication effectiveness
+
+Rules:
+- Be objective, realistic, and constructive.
+- Do NOT look for code or programming syntax. Focus purely on behavioral competency and soft skills.
+- Return ONLY valid JSON in this exact format:
+{
+  "score": number (0-10),
+  "strengths": string[],
+  "missing_points": string[],
+  "ideal_answer": string
+}
+`;
+  } else {
+    systemPrompt = `
 You are a strict technical interviewer evaluating a candidate.
 
 Evaluate based on:
@@ -380,6 +588,7 @@ Return ONLY valid JSON in this exact format:
   "ideal_answer": string
 }
 `;
+  }
 
   const userPrompt = `
 Role: ${role}

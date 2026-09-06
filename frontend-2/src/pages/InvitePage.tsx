@@ -2,11 +2,12 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
-import { Rocket, Briefcase, ChevronRight, AlertCircle, Loader2 } from "lucide-react";
+import { Rocket, Briefcase, ChevronRight, AlertCircle, Loader2, Users, Laptop } from "lucide-react";
 import axios from "axios";
 import api from "../lib/axios";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
+import { cn } from "../lib/utils";
 
 interface Template {
     _id: string;
@@ -16,6 +17,8 @@ interface Template {
     description?: string;
     totalQuestions: number;
     difficulty: string;
+    questionFormat?: string;
+    category?: string;
 }
 
 export default function InvitePage() {
@@ -67,6 +70,7 @@ export default function InvitePage() {
                 totalQuestions: template.totalQuestions,
                 difficulty: template.difficulty,
                 questionFormat: template.questionFormat || "blend",
+                category: template.category || "technical",
                 templateId: template._id
             });
 
@@ -122,7 +126,7 @@ export default function InvitePage() {
                         You've been invited to take an AI-powered screening interview for the <span className="text-foreground font-bold">{template.title}</span> position.
                     </p>
 
-                    <div className="flex flex-col gap-4 pt-4">
+                    <div className="flex flex-col gap-3 pt-4">
                         <div className="flex items-center gap-3 text-sm font-bold bg-white/5 p-4 rounded-2xl border border-white/5">
                             <div className="bg-primary/20 p-2 rounded-lg">
                                 <Briefcase className="h-4 w-4 text-primary" />
@@ -130,6 +134,19 @@ export default function InvitePage() {
                             <div>
                                 <p className="text-[10px] text-muted-foreground uppercase tracking-widest leading-none mb-1">Position</p>
                                 <p>{template.role}</p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 text-sm font-bold bg-white/5 p-4 rounded-2xl border border-white/5">
+                            <div className={cn(
+                                "p-2 rounded-lg",
+                                template.category === "behavioral" ? "bg-purple-500/20 text-purple-400" : "bg-blue-500/20 text-blue-400"
+                            )}>
+                                {template.category === "behavioral" ? <Users className="h-4 w-4" /> : <Laptop className="h-4 w-4" />}
+                            </div>
+                            <div>
+                                <p className="text-[10px] text-muted-foreground uppercase tracking-widest leading-none mb-1">Interview Track</p>
+                                <p>{template.category === "behavioral" ? "HR & Behavioral" : "Technical & Coding"}</p>
                             </div>
                         </div>
                     </div>

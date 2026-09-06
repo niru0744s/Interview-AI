@@ -22,7 +22,7 @@ const getOwnedInterview = async (interviewId, userId) => {
   return interview;
 };
 
-exports.startInterview = async ({ userId, role, topic, totalQuestions, resumeContent, resumeUrl, resumeData, templateId, difficulty, questionFormat }) => {
+exports.startInterview = async ({ userId, role, topic, totalQuestions, resumeContent, resumeUrl, resumeData, templateId, difficulty, questionFormat, category }) => {
   return Interview.create({
     userId,
     role,
@@ -33,7 +33,8 @@ exports.startInterview = async ({ userId, role, topic, totalQuestions, resumeCon
     resumeData: resumeData || null,
     templateId: templateId || null,
     difficulty: difficulty || "intermediate",
-    questionFormat: questionFormat || "blend"
+    questionFormat: questionFormat || "blend",
+    category: category || "technical"
   });
 };
 
@@ -82,6 +83,7 @@ exports.nextQuestion = async (interviewId, userId) => {
     topic: interview.topic,
     difficulty,
     questionFormat: interview.questionFormat || "blend",
+    category: interview.category || "technical",
     askedQuestions: asked.map((item) => item.question),
     resumeContent: interview.resumeContent,
     resumeData: interview.resumeData,
@@ -100,6 +102,7 @@ exports.nextQuestion = async (interviewId, userId) => {
       topic: interview.topic,
       difficulty,
       questionFormat: interview.questionFormat || "blend",
+      category: interview.category || "technical",
       askedQuestions: [...asked.map((item) => item.question), question.question],
       resumeContent: interview.resumeContent,
       resumeData: interview.resumeData,
@@ -192,6 +195,7 @@ exports.submitAnswer = async (interviewId, userId, payload) => {
       question,
       answer: answerText,
       questionType,
+      category: interview.category || "technical",
       selectedOptions,
       code,
       language,
@@ -391,6 +395,7 @@ exports.resumeInterview = async (interviewId, userId) => {
     interviewId,
     role: interview.role,
     topic: interview.topic,
+    category: interview.category || "technical",
     currentQuestionIndex: interview.currentQuestionIndex,
     totalQuestions: interview.totalQuestions,
     answeredCount: answers.length
