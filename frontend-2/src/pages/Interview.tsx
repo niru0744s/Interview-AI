@@ -6,10 +6,15 @@ import { useSocketStateMachine } from "../hooks/useSocketStateMachine";
 import InterviewHeader from "../components/interview/InterviewHeader";
 import InterviewLiveArea from "../components/interview/InterviewLiveArea";
 import { toast } from "sonner";
+import { cn } from "../lib/utils";
 
 type InterviewQuestion = {
   questionId: string;
   question: string;
+  type?: "conceptual" | "mcq" | "multi_choice" | "code";
+  options?: string[];
+  codeTemplate?: string | null;
+  language?: string | null;
   currentIndex?: number;
   totalQuestions?: number;
 };
@@ -22,16 +27,19 @@ type InterviewDetails = {
   role: string;
   topic: string;
   totalQuestions: number;
+  category?: "technical" | "behavioral";
 };
 
 export default function Interview() {
   const { interviewId } = useParams<RouteParams>();
   const navigate = useNavigate();
 
-
   const [question, setQuestion] = useState<InterviewQuestion | null>(null);
   const [details, setDetails] = useState<InterviewDetails | null>(null);
   const [answer, setAnswer] = useState<string>("");
+  const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
+  const [code, setCode] = useState<string>("");
+  const [selectedLanguage, setSelectedLanguage] = useState<string>("javascript");
   const [loading, setLoading] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [skipping, setSkipping] = useState<boolean>(false);
@@ -50,7 +58,8 @@ export default function Interview() {
       setDetails({
         role: res.data.role,
         topic: res.data.topic,
-        totalQuestions: res.data.totalQuestions
+        totalQuestions: res.data.totalQuestions,
+        category: res.data.category,
       });
     } catch (err) {
       console.error("Failed to fetch interview details", err);
@@ -77,6 +86,14 @@ export default function Interview() {
         return;
       }
       setQuestion(data.question);
+      setAnswer("");
+      setSelectedOptions([]);
+      if (data.question.type === "code") {
+        setCode(data.question.codeTemplate || "");
+        setSelectedLanguage(data.question.language || "javascript");
+      } else {
+        setCode("");
+      }
       setOptimisticAnswer(null);
       setLoading(false);
       setSkipping(false);
@@ -96,8 +113,6 @@ export default function Interview() {
       setSubmitting(false);
       setLoading(false);
       setOptimisticAnswer(null);
-      // If we previously cleared the answer due to optimism, we should ideally restore it.
-      // We rely on the ack callback to restore the answer if it was a submission error.
     });
 
     if (!question && !optimisticAnswer) {
@@ -111,31 +126,76 @@ export default function Interview() {
     };
   }, [socket, status, interviewId, navigate, question, fetchNextQuestion, optimisticAnswer]);
 
-  const handleSubmit = async (): Promise<void> => {
-    if (!interviewId || !answer.trim() || !question || !socket || submitting || skipping) return;
+  const isQuestionAnswered = useCallback((): boolean => {
+    if (!question) return false;
+    if (question.type === "mcq") {
+      return selectedOptions.length === 1;
+    }
+    if (question.type === "multi_choice") {
+      return selectedOptions.length > 0;
+    }
+    if (question.type === "code") {
+      return code.trim().length > 0;
+    }
+    return answer.trim().length > 0;
+  }, [question, selectedOptions, code, answer]);
 
-    const submittedAnswer = answer.trim();
-    setOptimisticAnswer(submittedAnswer);
-    setAnswer("");
+  const handleSubmit = async (): Promise<void> => {
+    if (!interviewId || !question || !socket || submitting || skipping || !isQuestionAnswered()) return;
+
+    let submittedText = "";
+    const payload: {
+      interviewId: string;
+      questionId: string;
+      answer: string;
+      selectedOptions?: string[];
+      code?: string;
+      language?: string;
+    } = {
+      interviewId,
+      questionId: question.questionId,
+      answer: "",
+    };
+
+    if (question.type === "mcq" || question.type === "multi_choice") {
+      submittedText = selectedOptions.join(", ");
+      payload.answer = submittedText;
+      payload.selectedOptions = selectedOptions;
+    } else if (question.type === "code") {
+      submittedText = code;
+      payload.answer = code;
+      payload.code = code;
+      payload.language = selectedLanguage;
+    } else {
+      submittedText = answer.trim();
+      payload.answer = submittedText;
+    }
+
+    setOptimisticAnswer(submittedText);
     setSubmitting(true);
     setLoading(true); // Lock the UI
 
     socket.emit(
       "submit_answer",
-      {
-        interviewId,
-        questionId: question.questionId,
-        answer: submittedAnswer,
-      },
+      payload,
       (ack: { status: string; message?: string }) => {
         setSubmitting(false);
         if (ack.status === "error") {
           toast.error(ack.message || "Failed to submit answer");
-          setAnswer(submittedAnswer);
+          if (question.type === "code") {
+            setCode(submittedText);
+          } else if (question.type === "mcq" || question.type === "multi_choice") {
+            setSelectedOptions(payload.selectedOptions || []);
+          } else {
+            setAnswer(submittedText);
+          }
           setOptimisticAnswer(null);
           setLoading(false); // Unlock if error
         } else {
           setQuestion(null);
+          setAnswer("");
+          setSelectedOptions([]);
+          setCode("");
         }
       }
     );
@@ -146,8 +206,11 @@ export default function Interview() {
 
     setSkipping(true);
     setLoading(true); // Lock the UI
+    setOptimisticAnswer("Skipping question...");
     socket.emit("skip_question", { interviewId });
-    setQuestion(null);
+    setAnswer("");
+    setSelectedOptions([]);
+    setCode("");
   };
 
   const handleQuit = async (): Promise<void> => {
@@ -173,25 +236,49 @@ export default function Interview() {
     );
   }
 
+  const canSubmit =
+    !submitting &&
+    !skipping &&
+    !loading &&
+    !cooldown &&
+    isQuestionAnswered() &&
+    status === "CONNECTED";
+
   return (
-    <div className="max-w-3xl mx-auto p-6 space-y-6">
+    <div
+      className={cn(
+        "mx-auto p-4 sm:p-6 space-y-6 transition-all duration-500",
+        question?.type === "code" ? "max-w-7xl" : "max-w-3xl"
+      )}
+    >
       <InterviewHeader
         role={details?.role}
         topic={details?.topic}
         currentIndex={question?.currentIndex}
         totalQuestions={question?.totalQuestions || details?.totalQuestions}
         status={status}
+        category={details?.category}
       />
 
       <InterviewLiveArea
         loading={loading}
         optimisticAnswer={optimisticAnswer}
         question={question?.question}
+        questionType={question?.type || "conceptual"}
+        options={question?.options}
+        codeTemplate={question?.codeTemplate}
+        language={question?.language}
         answer={answer}
         setAnswer={setAnswer}
+        selectedOptions={selectedOptions}
+        setSelectedOptions={setSelectedOptions}
+        code={code}
+        setCode={setCode}
+        selectedLanguage={selectedLanguage}
+        setSelectedLanguage={setSelectedLanguage}
         submitting={submitting}
         skipping={skipping || cooldown}
-        canSubmit={!submitting && !skipping && !loading && !cooldown && !!answer.trim() && status === "CONNECTED"}
+        canSubmit={canSubmit}
         onSubmit={handleSubmit}
         onSkip={handleSkip}
         onQuit={handleQuit}

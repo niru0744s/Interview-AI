@@ -4,12 +4,14 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from "../ui/card";
 import { cn } from "../../lib/utils";
-import { PREDEFINED_ROLES, TOPICS_MAPPING } from "../../utils/constants";
+import { PREDEFINED_ROLES, TOPICS_MAPPING, BEHAVIORAL_ROLES, BEHAVIORAL_TOPICS_MAPPING } from "../../utils/constants";
 import ResumeUpload from "./ResumeUpload";
-import { Target, FileText, ChevronLeft, Rocket, Briefcase, Zap, Gauge } from "lucide-react";
+import { Target, FileText, ChevronLeft, Rocket, Briefcase, Zap, Gauge, Sparkles, CheckSquare, Code2, MessageSquare, Users, Laptop } from "lucide-react";
 import { toast } from "sonner";
 
 export type DifficultyLevel = "beginner" | "intermediate" | "professional";
+export type QuestionFormat = "blend" | "mcq" | "coding" | "conceptual";
+export type InterviewCategory = "technical" | "behavioral";
 
 interface InterviewConfigDialogProps {
     onCancel: () => void;
@@ -18,6 +20,8 @@ interface InterviewConfigDialogProps {
         topic: string;
         totalQuestions: number;
         difficulty: DifficultyLevel;
+        questionFormat: QuestionFormat;
+        category: InterviewCategory;
         resumeFile: File | null;
         resumeText: string;
     }) => void;
@@ -28,13 +32,31 @@ type SetupMode = "selection" | "choice" | "resume";
 
 export default function InterviewConfigDialog({ onCancel, onLaunch, isCreating }: InterviewConfigDialogProps) {
     const [mode, setMode] = useState<SetupMode>("selection");
+    const [category, setCategory] = useState<InterviewCategory>("technical");
     const [selectedRole, setSelectedRole] = useState<string>(PREDEFINED_ROLES[0]);
     const [customRole, setCustomRole] = useState<string>("");
     const [selectedTopic, setSelectedTopic] = useState<string>(TOPICS_MAPPING[PREDEFINED_ROLES[0]][0]);
     const [customTopic, setCustomTopic] = useState<string>("");
     const [difficulty, setDifficulty] = useState<DifficultyLevel>("intermediate");
+    const [questionFormat, setQuestionFormat] = useState<QuestionFormat>("blend");
     const [totalQuestions, setTotalQuestions] = useState<number>(10);
     const [resumeData, setResumeData] = useState<{ file: File | null; text: string }>({ file: null, text: "" });
+
+    const handleCategoryChange = (newCategory: InterviewCategory) => {
+        setCategory(newCategory);
+        if (newCategory === "behavioral") {
+            setSelectedRole(BEHAVIORAL_ROLES[0]);
+            setSelectedTopic(BEHAVIORAL_TOPICS_MAPPING[BEHAVIORAL_ROLES[0]][0]);
+            if (questionFormat === "coding") {
+                setQuestionFormat("blend");
+            }
+        } else {
+            setSelectedRole(PREDEFINED_ROLES[0]);
+            setSelectedTopic(TOPICS_MAPPING[PREDEFINED_ROLES[0]][0]);
+        }
+        setCustomRole("");
+        setCustomTopic("");
+    };
 
     const handleLaunch = () => {
         let finalRole = "";
@@ -55,7 +77,7 @@ export default function InterviewConfigDialog({ onCancel, onLaunch, isCreating }
             return;
         }
         if (!finalTopic.trim()) {
-            toast.warning("Please specify a technical focus");
+            toast.warning("Please specify a focus topic");
             return;
         }
 
@@ -64,6 +86,8 @@ export default function InterviewConfigDialog({ onCancel, onLaunch, isCreating }
             topic: finalTopic,
             totalQuestions,
             difficulty,
+            questionFormat,
+            category: mode === "choice" ? category : "technical",
             resumeFile: resumeData.file,
             resumeText: resumeData.text
         });
@@ -112,106 +136,188 @@ export default function InterviewConfigDialog({ onCancel, onLaunch, isCreating }
         </div>
     );
 
-    const renderChoiceSetup = () => (
-        <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
-            <div className="space-y-3">
-                <Label className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground/60 flex items-center gap-2">
-                    <Briefcase className="h-3 w-3" /> Target Role
-                </Label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {PREDEFINED_ROLES.map((r) => (
-                        <Button
-                            key={r}
-                            variant={selectedRole === r ? "default" : "outline"}
-                            className={cn(
-                                "h-auto py-3 px-4 text-xs justify-center font-bold transition-all rounded-xl border-white/10",
-                                selectedRole === r && "btn-premium text-white border-transparent"
-                            )}
-                            onClick={() => {
-                                setSelectedRole(r);
-                                if (r !== "Other") {
-                                    setSelectedTopic(TOPICS_MAPPING[r][0]);
-                                }
-                            }}
-                        >
-                            {r}
-                        </Button>
-                    ))}
-                </div>
-                {selectedRole === "Other" && (
-                    <Input
-                        placeholder="Enter your custom role..."
-                        value={customRole}
-                        onChange={(e) => setCustomRole(e.target.value)}
-                        className="h-12 bg-background/50 border-white/10 rounded-xl"
-                    />
-                )}
-            </div>
+    const renderChoiceSetup = () => {
+        const rolesList = category === "behavioral" ? BEHAVIORAL_ROLES : PREDEFINED_ROLES;
+        const topicsMapping = category === "behavioral" ? BEHAVIORAL_TOPICS_MAPPING : TOPICS_MAPPING;
+        const formatOptions = category === "behavioral"
+            ? [
+                { id: "blend" as const, label: "AI Blend", desc: "MCQs + STAR Scenarios", icon: Sparkles },
+                { id: "mcq" as const, label: "Situational MCQs", desc: "Scenario Judgment", icon: CheckSquare },
+                { id: "conceptual" as const, label: "STAR Scenarios", desc: "Behavioral & Leadership", icon: MessageSquare }
+            ]
+            : [
+                { id: "blend" as const, label: "AI Blend", desc: "MCQ + Code + Theory", icon: Sparkles },
+                { id: "mcq" as const, label: "MCQ Focus", desc: "Multiple Choice Quiz", icon: CheckSquare },
+                { id: "coding" as const, label: "Coding Focus", desc: "Live Hands-On Tasks", icon: Code2 },
+                { id: "conceptual" as const, label: "Conceptual", desc: "Deep Theory & Arch", icon: MessageSquare }
+            ];
 
-            <div className="space-y-3">
-                <Label className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground/60 flex items-center gap-2">
-                    <Zap className="h-3 w-3" /> Technical focus
-                </Label>
-                <div className="flex flex-wrap gap-2">
-                    {(TOPICS_MAPPING[selectedRole] || TOPICS_MAPPING["Other"]).map((t) => (
+        return (
+            <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
+                {/* Track Selector */}
+                <div className="space-y-3">
+                    <Label className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground/60 flex items-center gap-2">
+                        <Target className="h-3 w-3" /> Interview Track
+                    </Label>
+                    <div className="grid grid-cols-2 gap-3">
                         <Button
-                            key={t}
-                            variant={selectedTopic === t ? "secondary" : "outline"}
-                            className={cn(
-                                "rounded-full px-4 h-9 text-xs font-black border-white/10 transition-all uppercase tracking-wider",
-                                selectedTopic === t && "bg-primary text-black border-primary scale-105"
-                            )}
-                            onClick={() => setSelectedTopic(t)}
-                        >
-                            {t}
-                        </Button>
-                    ))}
-                </div>
-                {selectedTopic === "Custom" && (
-                    <Input
-                        placeholder="Specify custom focus (e.g. AWS Lambda)..."
-                        value={customTopic}
-                        onChange={(e) => setCustomTopic(e.target.value)}
-                        className="h-12 bg-background/50 border-white/10 rounded-xl"
-                    />
-                )}
-            </div>
-
-            <div className="space-y-3">
-                <Label className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground/60 flex items-center gap-2">
-                    <Gauge className="h-3 w-3" /> Difficulty Level
-                </Label>
-                <div className="grid grid-cols-3 gap-2">
-                    {[
-                        { id: "beginner" as const, label: "Beginner", desc: "Core fundamentals" },
-                        { id: "intermediate" as const, label: "Intermediate", desc: "Industry standard" },
-                        { id: "professional" as const, label: "Professional", desc: "Deep & Complex" }
-                    ].map((d) => (
-                        <Button
-                            key={d.id}
                             type="button"
-                            variant={difficulty === d.id ? "default" : "outline"}
+                            variant={category === "technical" ? "default" : "outline"}
                             className={cn(
-                                "h-auto py-3 px-3 flex flex-col items-center justify-center gap-1 text-xs font-bold transition-all rounded-xl border-white/10",
-                                difficulty === d.id && "btn-premium text-white border-transparent"
+                                "h-auto py-3.5 px-4 flex items-center justify-center gap-2 text-xs font-black rounded-xl border-white/10 transition-all",
+                                category === "technical" && "btn-premium text-white border-transparent shadow-md"
                             )}
-                            onClick={() => setDifficulty(d.id)}
+                            onClick={() => handleCategoryChange("technical")}
                         >
-                            <span className="font-black uppercase tracking-wider">{d.label}</span>
-                            <span className={cn(
-                                "text-[10px] font-medium opacity-70",
-                                difficulty === d.id ? "text-white/80" : "text-muted-foreground"
-                            )}>
-                                {d.desc}
-                            </span>
+                            <Laptop className="h-4 w-4" />
+                            <span>Technical & Coding</span>
                         </Button>
-                    ))}
+                        <Button
+                            type="button"
+                            variant={category === "behavioral" ? "default" : "outline"}
+                            className={cn(
+                                "h-auto py-3.5 px-4 flex items-center justify-center gap-2 text-xs font-black rounded-xl border-white/10 transition-all",
+                                category === "behavioral" && "bg-gradient-to-r from-purple-600 to-indigo-600 text-white border-transparent shadow-md"
+                            )}
+                            onClick={() => handleCategoryChange("behavioral")}
+                        >
+                            <Users className="h-4 w-4" />
+                            <span>HR & Behavioral</span>
+                        </Button>
+                    </div>
                 </div>
-            </div>
 
-            {renderCommonSetup()}
-        </div>
-    );
+                <div className="space-y-3">
+                    <Label className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground/60 flex items-center gap-2">
+                        <Briefcase className="h-3 w-3" /> Target Role / Domain
+                    </Label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                        {rolesList.map((r) => (
+                            <Button
+                                key={r}
+                                variant={selectedRole === r ? "default" : "outline"}
+                                className={cn(
+                                    "h-auto min-h-[50px] py-2.5 px-3 text-xs justify-center font-bold transition-all rounded-xl border-white/10 text-center leading-tight whitespace-normal break-words",
+                                    selectedRole === r && (category === "behavioral" ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white border-transparent shadow-md" : "btn-premium text-white border-transparent")
+                                )}
+                                onClick={() => {
+                                    setSelectedRole(r);
+                                    if (r !== "Other") {
+                                        setSelectedTopic(topicsMapping[r]?.[0] || "Custom");
+                                    }
+                                }}
+                            >
+                                {r}
+                            </Button>
+                        ))}
+                    </div>
+                    {selectedRole === "Other" && (
+                        <Input
+                            placeholder="Enter your custom role..."
+                            value={customRole}
+                            onChange={(e) => setCustomRole(e.target.value)}
+                            className="h-12 bg-background/50 border-white/10 rounded-xl"
+                        />
+                    )}
+                </div>
+
+                <div className="space-y-3">
+                    <Label className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground/60 flex items-center gap-2">
+                        <Zap className="h-3 w-3" /> {category === "behavioral" ? "Behavioral Focus & Competency" : "Technical Focus"}
+                    </Label>
+                    <div className="flex flex-wrap gap-2">
+                        {(topicsMapping[selectedRole] || topicsMapping["Other"] || []).map((t) => (
+                            <Button
+                                key={t}
+                                variant={selectedTopic === t ? "secondary" : "outline"}
+                                className={cn(
+                                    "rounded-full px-4 py-2 h-auto text-xs font-black border-white/10 transition-all uppercase tracking-wider whitespace-normal text-center",
+                                    selectedTopic === t && (category === "behavioral" ? "bg-purple-600 text-white border-purple-500 scale-105" : "bg-primary text-black border-primary scale-105")
+                                )}
+                                onClick={() => setSelectedTopic(t)}
+                            >
+                                {t}
+                            </Button>
+                        ))}
+                    </div>
+                    {selectedTopic === "Custom" && (
+                        <Input
+                            placeholder="Specify custom focus (e.g. Executive Presence)..."
+                            value={customTopic}
+                            onChange={(e) => setCustomTopic(e.target.value)}
+                            className="h-12 bg-background/50 border-white/10 rounded-xl"
+                        />
+                    )}
+                </div>
+
+                <div className="space-y-3">
+                    <Label className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground/60 flex items-center gap-2">
+                        <Gauge className="h-3 w-3" /> Difficulty Level
+                    </Label>
+                    <div className="grid grid-cols-3 gap-2">
+                        {[
+                            { id: "beginner" as const, label: "Beginner", desc: "Core fundamentals" },
+                            { id: "intermediate" as const, label: "Intermediate", desc: "Industry standard" },
+                            { id: "professional" as const, label: "Professional", desc: "Deep & Complex" }
+                        ].map((d) => (
+                            <Button
+                                key={d.id}
+                                type="button"
+                                variant={difficulty === d.id ? "default" : "outline"}
+                                className={cn(
+                                    "h-auto py-3 px-3 flex flex-col items-center justify-center gap-1 text-xs font-bold transition-all rounded-xl border-white/10 text-center whitespace-normal",
+                                    difficulty === d.id && (category === "behavioral" ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white border-transparent" : "btn-premium text-white border-transparent")
+                                )}
+                                onClick={() => setDifficulty(d.id)}
+                            >
+                                <span className="font-black uppercase tracking-wider">{d.label}</span>
+                                <span className={cn(
+                                    "text-[10px] font-medium opacity-70",
+                                    difficulty === d.id ? "text-white/80" : "text-muted-foreground"
+                                    )}>
+                                    {d.desc}
+                                </span>
+                            </Button>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="space-y-3">
+                    <Label className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground/60 flex items-center gap-2">
+                        <Sparkles className="h-3 w-3 text-primary" /> Question Style & Format
+                    </Label>
+                    <div className={cn("grid gap-2", category === "behavioral" ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-2 sm:grid-cols-4")}>
+                        {formatOptions.map((fmt) => {
+                            const Icon = fmt.icon;
+                            return (
+                                <Button
+                                    key={fmt.id}
+                                    type="button"
+                                    variant={questionFormat === fmt.id ? "default" : "outline"}
+                                    className={cn(
+                                        "h-auto py-3 px-2 flex flex-col items-center justify-center gap-1.5 text-xs font-bold transition-all rounded-xl border-white/10 text-center whitespace-normal",
+                                        questionFormat === fmt.id && (category === "behavioral" ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white border-transparent" : "btn-premium text-white border-transparent")
+                                    )}
+                                    onClick={() => setQuestionFormat(fmt.id)}
+                                >
+                                    <Icon className={cn("h-4 w-4", questionFormat === fmt.id ? "text-white" : "text-primary")} />
+                                    <span className="font-black uppercase tracking-wider text-[11px]">{fmt.label}</span>
+                                    <span className={cn(
+                                        "text-[9px] font-medium leading-tight opacity-75 line-clamp-1",
+                                        questionFormat === fmt.id ? "text-white/90" : "text-muted-foreground"
+                                    )}>
+                                        {fmt.desc}
+                                    </span>
+                                </Button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {renderCommonSetup()}
+            </div>
+        );
+    };
 
     const renderResumeSetup = () => (
         <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
@@ -246,7 +352,7 @@ export default function InterviewConfigDialog({ onCancel, onLaunch, isCreating }
     );
 
     return (
-        <div className="max-w-xl mx-auto p-6">
+        <div className="max-w-2xl mx-auto p-4 sm:p-6">
             <Card className="glass border-white/10 shadow-2xl rounded-3xl overflow-hidden">
                 <CardHeader className="bg-gradient-to-br from-primary/10 via-transparent to-transparent pb-8">
                     <div className="flex items-center gap-4 mb-2">

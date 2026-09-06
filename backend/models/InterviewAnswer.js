@@ -7,8 +7,19 @@ const interviewAnswerSchema = new mongoose.Schema(
       ref: "Interview",
       required: true
     },
+    questionIndex: { type: Number, default: 0 },
     question: { type: String, required: true },
+    questionType: {
+      type: String,
+      enum: ["conceptual", "mcq", "multi_choice", "code"],
+      default: "conceptual"
+    },
     answer: { type: String },
+    selectedOptions: { type: [String], default: [] },
+    codeAnswer: {
+      code: { type: String, default: null },
+      language: { type: String, default: null }
+    },
     score: { type: Number, default: 0 },
     isSkipped: { type: Boolean, default: false },
     strengths: [{ type: String }],
@@ -19,6 +30,6 @@ const interviewAnswerSchema = new mongoose.Schema(
 );
 
 interviewAnswerSchema.index({ interviewId: 1, createdAt: 1 });
-interviewAnswerSchema.index({ interviewId: 1, question: 1 }, { unique: true });
+interviewAnswerSchema.index({ interviewId: 1, questionIndex: 1 });
 
 module.exports = mongoose.model("InterviewAnswer", interviewAnswerSchema);

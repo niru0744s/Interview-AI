@@ -31,6 +31,16 @@ const jobTemplateSchema = new mongoose.Schema({
         enum: ["beginner", "intermediate", "professional"],
         default: "intermediate"
     },
+    questionFormat: {
+        type: String,
+        enum: ["blend", "mcq", "coding", "conceptual"],
+        default: "blend"
+    },
+    category: {
+        type: String,
+        enum: ["technical", "behavioral"],
+        default: "technical"
+    },
     inviteCode: {
         type: String,
         unique: true,

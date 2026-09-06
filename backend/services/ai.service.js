@@ -77,70 +77,363 @@ Return ONLY valid JSON in this exact format. If a field is missing, return an em
 };
 
 /**
- * Generate one interview question
+ * Generate one interview question with structured format (conceptual, mcq, or code)
  */
-exports.generateQuestion = async ({ role, topic, difficulty, askedQuestions, resumeContent, resumeData }) => {
-  let systemPrompt = `
-You are a strict technical interviewer for a ${role} role.
-The specific focus/topic for this part of the interview is: ${topic}.
+exports.generateQuestion = async ({
+  role,
+  topic,
+  difficulty,
+  questionFormat = "blend",
+  category = "technical",
+  askedQuestions = [],
+  resumeContent,
+  resumeData,
+  questionIndex = 0,
+  totalQuestions = 10
+}) => {
+  const isBehavioral = category === "behavioral";
+
+  // Determine target question type based on category, questionFormat, and position
+  let targetType = "conceptual";
+  if (isBehavioral) {
+    if (questionFormat === "mcq") {
+      targetType = "mcq";
+    } else if (questionFormat === "conceptual") {
+      targetType = "conceptual";
+    } else {
+      // Behavioral Blend: situational judgment MCQ warm-up, then rich STAR behavioral scenarios
+      if (questionIndex === 0 || (totalQuestions > 5 && questionIndex === 1)) {
+        targetType = "mcq";
+      } else {
+        targetType = "conceptual";
+      }
+    }
+  } else {
+    // Technical track
+    if (questionFormat === "mcq") {
+      targetType = "mcq";
+    } else if (questionFormat === "coding") {
+      targetType = "code";
+    } else if (questionFormat === "conceptual") {
+      targetType = "conceptual";
+    } else {
+      // Dynamic Blend strategy for technical:
+      // Start with MCQ warm-ups, transition to code, balance with conceptual
+      if (totalQuestions <= 5) {
+        if (questionIndex === 0) targetType = "mcq";
+        else if (questionIndex === 2) targetType = "code";
+        else targetType = "conceptual";
+      } else {
+        if (questionIndex < 2) {
+          targetType = "mcq";
+        } else if (
+          questionIndex >= Math.floor(totalQuestions * 0.4) &&
+          questionIndex < Math.floor(totalQuestions * 0.4) + 2
+        ) {
+          targetType = "code";
+        } else {
+          targetType = "conceptual";
+        }
+      }
+    }
+  }
+
+  let systemPrompt;
+  if (isBehavioral) {
+    let typeSpecificRules = "";
+    if (targetType === "mcq") {
+      typeSpecificRules = `
+You must output ONLY valid JSON in this exact structure:
+{
+  "type": "mcq",
+  "question": "Workplace situational judgment scenario",
+  "options": ["Option A", "Option B", "Option C", "Option D"],
+  "correctAnswers": ["Option A"],
+  "codeTemplate": null,
+  "language": null
+}
+
+Rules:
+- "question" must present a realistic workplace situational judgment scenario (e.g. cross-team disagreement, critical project delay, ethical dilemma, managing difficult stakeholders).
+- "options" MUST contain exactly 4 distinct, plausible workplace actions.
+- "correctAnswers" MUST contain exactly 1 most professional, constructive action matching an item in "options".
+- "codeTemplate" must be null.
+- "language" must be null.
 `;
+    } else {
+      // conceptual
+      typeSpecificRules = `
+You must output ONLY valid JSON in this exact structure:
+{
+  "type": "conceptual",
+  "question": "Open-ended behavioral scenario (STAR method)",
+  "options": [],
+  "correctAnswers": [],
+  "codeTemplate": null,
+  "language": null
+}
+
+Rules:
+- "question" must be an open-ended behavioral scenario (prompting the candidate to use the STAR method: Situation, Task, Action, Result) regarding teamwork, communication, handling failure, conflict, or high-pressure situations.
+- Strictly NO coding or technical syntax requests.
+- "options" must be [].
+- "correctAnswers" must be [].
+- "codeTemplate" must be null.
+- "language" must be null.
+`;
+    }
+
+    systemPrompt = `
+You are an Executive HR Director and Leadership Talent Partner conducting a professional Behavioral & Culture Fit interview for a ${role} position.
+Specific Focus Area: ${topic}.
+Seniority / Depth Level: ${difficulty}.
+Required Format: ONLY ${targetType.toUpperCase()}.
+${typeSpecificRules}
+`;
+  } else {
+    // Technical track
+    let typeSpecificRules = "";
+    if (targetType === "mcq") {
+      typeSpecificRules = `
+You must output ONLY valid JSON in this exact structure:
+{
+  "type": "mcq",
+  "question": "Concise, realistic multiple-choice technical question",
+  "options": ["Option A", "Option B", "Option C", "Option D"],
+  "correctAnswers": ["Option A"],
+  "codeTemplate": null,
+  "language": null
+}
+
+Rules:
+- "question" must be a concise, realistic multiple-choice technical question testing ${topic}.
+- "options" MUST contain exactly 4 distinct, plausible technical options.
+- "correctAnswers" MUST contain exactly 1 correct option matching one of the items in "options".
+- "codeTemplate" must be null.
+- "language" must be null.
+`;
+    } else if (targetType === "code") {
+      typeSpecificRules = `
+You must output ONLY valid JSON in this exact structure:
+{
+  "type": "code",
+  "question": "Detailed coding challenge description with problem requirements, inputs, expected output, and edge cases",
+  "options": [],
+  "correctAnswers": [],
+  "codeTemplate": "// Starter code / function template\\nfunction solution() {\\n  // TODO\\n}",
+  "language": "javascript"
+}
+
+Rules:
+- "question" must clearly describe a practical coding challenge relevant to ${role} and ${topic} (e.g. React component/hook, Express route/middleware, database query, or utility algorithm). Include inputs, expected output, and edge cases.
+- "options" must be [].
+- "correctAnswers" must be [].
+- "codeTemplate" MUST provide clean starter code / function signature / component shell with TODO comments.
+- "language" should be "javascript" or "typescript".
+`;
+    } else {
+      // conceptual
+      typeSpecificRules = `
+You must output ONLY valid JSON in this exact structure:
+{
+  "type": "conceptual",
+  "question": "In-depth technical conceptual / architectural question",
+  "options": [],
+  "correctAnswers": [],
+  "codeTemplate": null,
+  "language": null
+}
+
+Rules:
+- "question" must test technical depth, trade-offs, architecture, or internal mechanics of ${topic}.
+- Strictly NO multiple-choice options or code editor prompts.
+- "options" must be [].
+- "correctAnswers" must be [].
+- "codeTemplate" must be null.
+- "language" must be null.
+`;
+    }
+
+    systemPrompt = `
+You are a senior technical interviewer conducting an interview for a ${role} position.
+Specific topic: ${topic}.
+Difficulty: ${difficulty}.
+Required Format: ONLY ${targetType.toUpperCase()}.
+${typeSpecificRules}
+`;
+  }
 
   if (resumeData && typeof resumeData === 'object' && Object.keys(resumeData).length > 0) {
     systemPrompt += `
-The candidate's structured resume data is provided below. 
-You must ask ONE SHORT AND DIRECT technical question based on their actual experience.
-Do this by picking ONE skill and ONE project from the data.
-
-RESUME DATA:
+Candidate's structured resume data:
 ${JSON.stringify(resumeData, null, 2)}
+Where possible, tailor the question to their background or tech stack.
 `;
   } else if (resumeContent) {
     systemPrompt += `
-I have provided the candidate's raw resume/experience below. 
-Use this context to tailor your questions to their actual background, projects, and skills where possible. 
-
-RESUME CONTEXT:
+Candidate's resume context:
 ${resumeContent}
 `;
   }
 
   systemPrompt += `
-Rules:
-- Ask exactly ONE direct question.
-- Do NOT ask multi-part questions (e.g., avoid "1. ..., 2. ..., 3. ...").
-- Keep your question under 3 sentences.
-- Focus strictly on ${topic}.
-- No explanations or hints.
-- Do not repeat previous questions.
-- Difficulty: ${difficulty}
+General Rules:
+- Ask exactly ONE question in ${targetType.toUpperCase()} format.
+- Do NOT repeat previous questions.
+- Return strictly valid JSON with no markdown wrapping or outer text.
 `;
 
   const userPrompt = `
 Previously asked questions:
-${askedQuestions.join("\n")}
+${askedQuestions.length > 0 ? askedQuestions.join("\n") : "None (this is the first question)"}
 
-Ask the next question.
+Generate question #${questionIndex + 1} of ${totalQuestions} strictly in ${targetType} format.
 `;
 
-  const client = getAIClient();
-  const response = await client.chat.completions.create({
-    model: "openai/gpt-oss-20b",
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt }
-    ],
-    temperature: 0.4
-  });
+  try {
+    const client = getAIClient();
+    const response = await client.chat.completions.create({
+      model: "openai/gpt-oss-20b",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ],
+      temperature: 0.3,
+      response_format: { type: "json_object" }
+    });
 
-  return {
-    questionId: `q_${Date.now()}`,
-    question: response.choices[0].message.content.trim()
-  };
-}
+    const rawContent = response.choices[0].message.content.trim();
+    const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error("No JSON found in question generator response");
+    }
 
-exports.evaluateAnswer = async ({ role, question, answer }) => {
+    const parsed = JSON.parse(jsonMatch[0]);
+
+    // Strictly enforce the targetType so model drift cannot alter the user's requested format
+    const validatedType = targetType;
+
+    let options = Array.isArray(parsed.options) ? parsed.options : [];
+    let correctAnswers = Array.isArray(parsed.correctAnswers) ? parsed.correctAnswers : [];
+    let codeTemplate = parsed.codeTemplate || null;
+    let language = parsed.language || null;
+
+    if (validatedType === "mcq") {
+      if (options.length < 2) {
+        options = [
+          `Properly configure and apply ${topic} patterns`,
+          `Optimize performance using asynchronous patterns`,
+          `Implement automated testing and validation`,
+          `Separate architectural boundaries into modular layers`
+        ];
+        correctAnswers = [options[0]];
+      }
+      codeTemplate = null;
+      language = null;
+    } else if (validatedType === "code") {
+      options = [];
+      correctAnswers = [];
+      if (!codeTemplate) {
+        codeTemplate = `// Problem: ${parsed.question || topic}\n// Implement your solution below\n\nfunction solution() {\n  // TODO\n}\n`;
+      }
+      if (!language) {
+        language = "javascript";
+      }
+    } else {
+      // conceptual
+      options = [];
+      correctAnswers = [];
+      codeTemplate = null;
+      language = null;
+    }
+
+    return {
+      questionId: `q_${Date.now()}`,
+      type: validatedType,
+      question: parsed.question || (validatedType === "code"
+        ? `Implement a robust function handling ${topic} for a ${role} application.`
+        : `Could you explain key architectural principles and best practices for ${topic} in a ${role} role?`),
+      options,
+      correctAnswers,
+      codeTemplate,
+      language
+    };
+  } catch (err) {
+    logger.error("Failed to generate structured question", { message: err.message, stack: err.stack });
+
+    // Type-aware fallback ensures the question format always respects targetType
+    if (targetType === "mcq") {
+      const fallbackOptions = isBehavioral
+        ? [
+            "Actively listen to team members and organize a structured alignment meeting.",
+            "Escalate immediately to senior leadership without consulting peers.",
+            "Proceed with the initial plan regardless of team feedback.",
+            "Postpone all related deliverables until consensus emerges naturally."
+          ]
+        : [
+            `Utilize modular design and clear abstractions for ${topic}.`,
+            `Bypass standard validation to maximize throughput.`,
+            `Hardcode values directly into the runtime environment.`,
+            `Disable error logging to conserve memory.`
+          ];
+
+      return {
+        questionId: `q_${Date.now()}`,
+        type: "mcq",
+        question: isBehavioral
+          ? `When encountering unexpected stakeholder disagreements regarding ${topic}, which course of action is most effective?`
+          : `Which of the following represents the industry best practice when designing ${topic} solutions for a ${role}?`,
+        options: fallbackOptions,
+        correctAnswers: [fallbackOptions[0]],
+        codeTemplate: null,
+        language: null
+      };
+    }
+
+    if (targetType === "code") {
+      return {
+        questionId: `q_${Date.now()}`,
+        type: "code",
+        question: `Write an efficient function or module in JavaScript/TypeScript demonstrating proper implementation of ${topic} for a ${role} system. Handle edge cases and optimize for maintainability.`,
+        options: [],
+        correctAnswers: [],
+        codeTemplate: `/**\n * Solution for ${topic}\n * Role: ${role}\n */\nfunction solution(input) {\n  // Write your implementation here\n}\n\nmodule.exports = { solution };\n`,
+        language: "javascript"
+      };
+    }
+
+    // Default conceptual fallback
+    return {
+      questionId: `q_${Date.now()}`,
+      type: "conceptual",
+      question: isBehavioral
+        ? `Describe a challenging situation in your career involving ${topic}. How did you assess the problem, what actions did you take, and what was the outcome?`
+        : `Could you explain key architectural principles and best practices for ${topic} in a ${role} role?`,
+      options: [],
+      correctAnswers: [],
+      codeTemplate: null,
+      language: null
+    };
+  }
+};
+
+exports.evaluateAnswer = async ({
+  role,
+  question,
+  answer,
+  questionType = "conceptual",
+  category = "technical",
+  selectedOptions = [],
+  code = "",
+  language = "javascript",
+  correctAnswers = []
+}) => {
+  const answerPayload = (questionType === "mcq" || questionType === "multi_choice")
+    ? (Array.isArray(selectedOptions) ? selectedOptions.join(", ") : String(selectedOptions || ""))
+    : (questionType === "code" ? (code || answer || "") : (answer || ""));
+
   const cacheKey = crypto.createHash('sha256')
-    .update(`eval_${role}_${question}_${answer}`)
+    .update(`eval_${category}_${role}_${question}_${questionType}_${answerPayload}`)
     .digest('hex');
 
   // Check Cache
@@ -150,7 +443,130 @@ exports.evaluateAnswer = async ({ role, question, answer }) => {
     return cached.value;
   }
 
-  const systemPrompt = `
+  // 1. MCQ & Multi-Choice Evaluation: Deterministic grading
+  if (questionType === "mcq" || questionType === "multi_choice") {
+    const selected = Array.isArray(selectedOptions) ? selectedOptions : [selectedOptions].filter(Boolean);
+    const correct = Array.isArray(correctAnswers) ? correctAnswers : [correctAnswers].filter(Boolean);
+
+    const isMatch = selected.length > 0 && correct.some(c =>
+      selected.some(s => s && s.trim().toLowerCase() === c.trim().toLowerCase())
+    );
+
+    const score = isMatch ? 10 : 0;
+    const strengths = isMatch ? ["Selected the correct answer accurately."] : [];
+    const missing_points = isMatch ? [] : [`Selected "${selected[0] || 'none'}" instead of the correct answer.`];
+    const ideal_answer = correct[0] || "Correct option";
+
+    const result = {
+      score,
+      strengths,
+      missing_points,
+      ideal_answer
+    };
+
+    await AICache.create({
+      key: cacheKey,
+      value: result,
+      type: 'evaluation'
+    }).catch(err => logger.error("Cache write error", { message: err.message }));
+
+    return result;
+  }
+
+  // 2. Code Evaluation: Review code implementation without sandbox runner
+  if (questionType === "code") {
+    const systemPrompt = `
+You are a senior technical interviewer reviewing a candidate's code submission for a ${role} interview.
+Review the candidate's implementation for: ${question}
+
+Evaluate based on:
+1. Logic & Functional Correctness (does it solve the problem, handle React state/hooks or backend routes properly)
+2. Architecture, Clean Code & Best Practices
+3. Handling of Edge Cases & Error Boundaries
+4. Performance & Complexity
+
+Rules:
+- Be strict, objective, and realistic.
+- Return ONLY valid JSON in this exact format:
+{
+  "score": number (0-10),
+  "strengths": string[],
+  "missing_points": string[],
+  "ideal_answer": string
+}
+`;
+
+    const userPrompt = `
+Problem: ${question}
+Candidate Code Submission (${language || "javascript"}):
+\`\`\`${language || "javascript"}
+${code || answer}
+\`\`\`
+Candidate Additional Notes: ${answer || "None"}
+`;
+
+    try {
+      const client = getAIClient();
+      const response = await client.chat.completions.create({
+        model: "openai/gpt-oss-20b",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        temperature: 0.2,
+        response_format: { type: "json_object" }
+      });
+
+      const content = response.choices[0].message.content;
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error("AI failed to return code evaluation JSON");
+      }
+
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (parsed.ideal_answer === undefined) parsed.ideal_answer = "Clean implementation covering core logic and edge cases.";
+      if (!Array.isArray(parsed.strengths)) parsed.strengths = [];
+      if (!Array.isArray(parsed.missing_points)) parsed.missing_points = [];
+      if (typeof parsed.score !== "number") parsed.score = Number(parsed.score) || 0;
+
+      await AICache.create({
+        key: cacheKey,
+        value: parsed,
+        type: 'evaluation'
+      }).catch(err => logger.error("Cache write error", { message: err.message }));
+
+      return parsed;
+    } catch (err) {
+      logger.error("AI code evaluation failed", { message: err.message, stack: err.stack });
+      throw new Error("AI evaluation failed. Please retry.");
+    }
+  }
+
+  // 3. Conceptual / Behavioral Evaluation
+  let systemPrompt;
+  if (category === "behavioral") {
+    systemPrompt = `
+You are an Executive HR & Talent Director evaluating a candidate's behavioral interview response for a ${role} position.
+
+Evaluate based on:
+1. STAR Framework completeness (Situation, Task, Action taken, measurable/clear Result)
+2. Professional maturity, accountability, and empathy
+3. Conflict resolution, stakeholder management, and team collaboration
+4. Clarity, structure, and communication effectiveness
+
+Rules:
+- Be objective, realistic, and constructive.
+- Do NOT look for code or programming syntax. Focus purely on behavioral competency and soft skills.
+- Return ONLY valid JSON in this exact format:
+{
+  "score": number (0-10),
+  "strengths": string[],
+  "missing_points": string[],
+  "ideal_answer": string
+}
+`;
+  } else {
+    systemPrompt = `
 You are a strict technical interviewer evaluating a candidate.
 
 Evaluate based on:
@@ -172,6 +588,7 @@ Return ONLY valid JSON in this exact format:
   "ideal_answer": string
 }
 `;
+  }
 
   const userPrompt = `
 Role: ${role}

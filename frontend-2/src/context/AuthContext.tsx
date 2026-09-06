@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useMemo, ReactNode } from "react";
 import api from "../lib/axios";
 
 export type User = {
@@ -43,11 +43,11 @@ export const AuthProvider = ({ children }: AuthContextProps) => {
         checkAuth();
     }, []);
 
-    const login = (userData: User): void => {
+    const login = useCallback((userData: User): void => {
         setUser(userData);
-    };
+    }, []);
 
-    const logout = async (): Promise<void> => {
+    const logout = useCallback(async (): Promise<void> => {
         try {
             await api.post("/auth/logout");
         } catch {
@@ -55,9 +55,9 @@ export const AuthProvider = ({ children }: AuthContextProps) => {
         } finally {
             setUser(null);
         }
-    };
+    }, []);
 
-    const switchRole = async (): Promise<"candidate" | "recruiter"> => {
+    const switchRole = useCallback(async (): Promise<"candidate" | "recruiter"> => {
         try {
             const res = await api.post("/auth/switch-role");
             const newRole = res.data.role;
@@ -67,17 +67,26 @@ export const AuthProvider = ({ children }: AuthContextProps) => {
             console.error("Failed to switch role", err);
             throw err;
         }
-    };
+    }, []);
 
-    const setUserContext = (userData: User | null) => {
+    const setUserContext = useCallback((userData: User | null) => {
         setUser(userData);
-    }
+    }, []);
+
+    const value = useMemo(() => ({
+        user,
+        loading,
+        login,
+        logout,
+        switchRole,
+        setUserContext
+    }), [user, loading, login, logout, switchRole, setUserContext]);
 
     return (
-        <AuthContext.Provider value={{ user, loading, login, logout, switchRole, setUserContext }}>
+        <AuthContext.Provider value={value}>
             {children}
         </AuthContext.Provider>
-    )
+    );
 };
 
 export const useAuth = (): AuthContextType => {

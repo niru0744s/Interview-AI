@@ -6,9 +6,10 @@ interface InterviewHeaderProps {
     currentIndex: number | undefined;
     totalQuestions: number | undefined;
     status: string;
+    category?: "technical" | "behavioral" | string;
 }
 
-export default function InterviewHeader({ role, topic, currentIndex, totalQuestions, status }: InterviewHeaderProps) {
+export default function InterviewHeader({ role, topic, currentIndex, totalQuestions, status, category }: InterviewHeaderProps) {
     const progress = totalQuestions ? ((currentIndex || 0) / totalQuestions) * 100 : 0;
 
     return (
@@ -22,6 +23,15 @@ export default function InterviewHeader({ role, topic, currentIndex, totalQuesti
                         <h2 className="text-2xl font-black tracking-tight">{role || "Practice Session"}</h2>
                     </div>
                     <div className="flex items-center gap-3">
+                        {category === "behavioral" ? (
+                            <span className="text-xs font-black text-purple-400 bg-purple-500/10 px-2.5 py-1 rounded-md uppercase tracking-widest border border-purple-500/20">
+                                HR & Behavioral
+                            </span>
+                        ) : (
+                            <span className="text-xs font-black text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-md uppercase tracking-widest border border-blue-500/20">
+                                Technical
+                            </span>
+                        )}
                         {topic && (
                             <span className="text-xs font-black text-primary bg-primary/10 px-2.5 py-1 rounded-md uppercase tracking-widest border border-primary/20">
                                 {topic}

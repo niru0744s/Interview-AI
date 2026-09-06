@@ -1,4 +1,4 @@
-import { Suspense, lazy, useRef } from "react";
+import { Suspense, lazy, useRef, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -18,26 +18,10 @@ import {
   useTransform,
   useSpring,
 } from "framer-motion";
-import {
-  LineChart,
-  Line,
-  ResponsiveContainer,
-} from "recharts";
 
 const Spline = lazy(() => import("@splinetool/react-spline"));
 
 /* ─── Data ─── */
-const chartData = [
-  { week: "W1", score: 52 },
-  { week: "W2", score: 61 },
-  { week: "W3", score: 58 },
-  { week: "W4", score: 74 },
-  { week: "W5", score: 79 },
-  { week: "W6", score: 88 },
-  { week: "W7", score: 93 },
-];
-
-
 const candidates = [
   { name: "Arjun Sharma", role: "Senior SWE", score: 94, skills: ["System Design", "DSA", "React"] },
   { name: "Priya Nair", role: "ML Engineer", score: 87, skills: ["Python", "TensorFlow", "SQL"] },
@@ -97,6 +81,27 @@ const Landing = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
+  const [loadSpline, setLoadSpline] = useState(false);
+
+  useEffect(() => {
+    // Defer loading heavy 3D canvas until after first paint on desktop
+    if (typeof window !== "undefined" && window.innerWidth >= 768) {
+      if ("requestIdleCallback" in window) {
+        const id = (window as unknown as { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback(
+          () => setLoadSpline(true),
+          { timeout: 1200 }
+        );
+        return () => {
+          if ("cancelIdleCallback" in window) {
+            (window as unknown as { cancelIdleCallback: (n: number) => void }).cancelIdleCallback(id);
+          }
+        };
+      } else {
+        const timer = setTimeout(() => setLoadSpline(true), 800);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, []);
 
   const { scrollYProgress } = useScroll({
     target: containerRef,
@@ -225,11 +230,15 @@ const Landing = () => {
               onTouchMoveCapture={(e) => e.stopPropagation()}
               onPointerDownCapture={(e) => e.stopPropagation()}
             >
-              <Spline
-                scene="https://prod.spline.design/dhb0v5FSbB1IMMYP/scene.splinecode"
-                style={{ width: "100%", height: "100%", background: "transparent", pointerEvents: "auto", overflow: "visible" }}
-                className="overflow-visible"
-              />
+              {loadSpline ? (
+                <Spline
+                  scene="https://prod.spline.design/dhb0v5FSbB1IMMYP/scene.splinecode"
+                  style={{ width: "100%", height: "100%", background: "transparent", pointerEvents: "auto", overflow: "visible" }}
+                  className="overflow-visible"
+                />
+              ) : (
+                <div className="w-[500px] h-[500px] rounded-full bg-cyan-500/10 blur-[100px] animate-pulse" />
+              )}
             </div>
           </Suspense>
 
@@ -335,25 +344,30 @@ const Landing = () => {
                     +41%
                   </div>
                 </div>
-                <div className="flex-1 relative z-10 w-full min-w-0 min-h-0">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData}>
-                      <defs>
-                        <linearGradient id="cyanGrad" x1="0" y1="0" x2="1" y2="0">
-                          <stop offset="0%" stopColor="#22D3EE" />
-                          <stop offset="100%" stopColor="#94A3B8" />
-                        </linearGradient>
-                      </defs>
-                      <Line
-                        type="monotone"
-                        dataKey="score"
-                        stroke="url(#cyanGrad)"
-                        strokeWidth={4}
-                        dot={false}
-                        animationDuration={2000}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
+                <div className="flex-1 relative z-10 w-full min-w-0 min-h-0 flex items-center justify-center pt-2">
+                  <svg viewBox="0 0 300 120" className="w-full h-full overflow-visible" preserveAspectRatio="none">
+                    <defs>
+                      <linearGradient id="cyanGrad" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stopColor="#22D3EE" />
+                        <stop offset="100%" stopColor="#94A3B8" />
+                      </linearGradient>
+                      <linearGradient id="cyanArea" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#22D3EE" stopOpacity="0.25" />
+                        <stop offset="100%" stopColor="#22D3EE" stopOpacity="0" />
+                      </linearGradient>
+                    </defs>
+                    <path
+                      d="M 0 100 Q 40 85, 75 75 T 150 45 T 225 25 T 300 10 L 300 120 L 0 120 Z"
+                      fill="url(#cyanArea)"
+                    />
+                    <path
+                      d="M 0 100 Q 40 85, 75 75 T 150 45 T 225 25 T 300 10"
+                      fill="none"
+                      stroke="url(#cyanGrad)"
+                      strokeWidth="4"
+                      strokeLinecap="round"
+                    />
+                  </svg>
                 </div>
                 <div className="absolute -bottom-20 -right-20 w-60 h-60 rounded-full bg-cyan-500/10 blur-[60px] group-hover:bg-cyan-500/20 transition-colors duration-700" />
               </motion.div>

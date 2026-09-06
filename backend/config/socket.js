@@ -53,13 +53,18 @@ exports.initSocket = (io) => {
             }
         });
 
-        socket.on("submit_answer", async ({ interviewId, answer }, callback) => {
-            if (typeof callback === "function") {
-                callback({ status: "ok" });
-            }
-
+        socket.on("submit_answer", async ({ interviewId, answer, selectedOptions, code, language }, callback) => {
             try {
-                const evaluation = await submitAnswer(interviewId, socket.userId, answer);
+                const evaluation = await submitAnswer(interviewId, socket.userId, {
+                    answer,
+                    selectedOptions,
+                    code,
+                    language
+                });
+
+                if (typeof callback === "function") {
+                    callback({ status: "ok" });
+                }
 
                 if (evaluation.interviewCompleted) {
                     socket.emit("interview_completed", evaluation);
@@ -74,6 +79,9 @@ exports.initSocket = (io) => {
                     message: error.message,
                     stack: error.stack
                 });
+                if (typeof callback === "function") {
+                    callback({ status: "error", message: error.message });
+                }
                 socket.emit("error", error.message || "Failed to process answer");
             }
         });
